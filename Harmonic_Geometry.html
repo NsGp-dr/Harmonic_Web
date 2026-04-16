@@ -1,0 +1,1031 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HARMONIC GEOMETRY</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&display=swap');
+
+  :root {
+    --green: #00ff41;
+    --green-dim: #00aa2a;
+    --green-glow: rgba(0,255,65,0.15);
+    --red: #ff2200;
+    --amber: #ffaa00;
+    --bg: #020806;
+    --panel: rgba(0,15,5,0.85);
+  }
+
+  * { margin:0; padding:0; box-sizing:border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--green);
+    font-family: 'Share Tech Mono', monospace;
+    overflow: hidden;
+    height: 100vh;
+    display: grid;
+    grid-template-rows: 48px 1fr 140px;
+    grid-template-columns: 200px 1fr 200px;
+  }
+
+  /* HEADER */
+  header {
+    grid-column: 1/-1;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 20px;
+    border-bottom: 1px solid var(--green-dim);
+    background: var(--panel);
+    letter-spacing: 0.15em;
+  }
+  header h1 {
+    font-family: 'Orbitron', monospace;
+    font-size: 0.85rem;
+    font-weight: 900;
+    text-shadow: 0 0 12px var(--green);
+  }
+  .status-row {
+    display: flex;
+    gap: 20px;
+    font-size: 0.65rem;
+    color: var(--green-dim);
+  }
+  .status-row span { color: var(--green); }
+
+  /* LEFT PANEL — chord map */
+  .panel-left {
+    grid-row: 2;
+    background: var(--panel);
+    border-right: 1px solid var(--green-dim);
+    padding: 12px 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    overflow: hidden;
+  }
+  .panel-title {
+    font-family: 'Orbitron', monospace;
+    font-size: 0.55rem;
+    letter-spacing: 0.2em;
+    color: var(--green-dim);
+    margin-bottom: 4px;
+  }
+
+  /* interval bars like the image */
+  .interval-container {
+    display: flex;
+    gap: 3px;
+    height: 180px;
+    align-items: flex-end;
+  }
+  .interval-bar-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    flex: 1;
+  }
+  .interval-label {
+    font-size: 0.45rem;
+    color: var(--green-dim);
+    white-space: nowrap;
+  }
+  .interval-bar {
+    width: 100%;
+    background: transparent;
+    border: 1px solid var(--green-dim);
+    border-radius: 2px;
+    position: relative;
+    overflow: hidden;
+    height: 150px;
+    transition: border-color 0.1s;
+  }
+  .interval-bar.active { border-color: var(--green); box-shadow: 0 0 6px var(--green); }
+  .interval-fill {
+    position: absolute;
+    bottom: 0;
+    width: 100%;
+    background: linear-gradient(to top, var(--green), var(--green-dim));
+    transition: height 0.05s;
+    box-shadow: 0 0 4px var(--green);
+  }
+
+  /* chord display */
+  .chord-display {
+    margin-top: 8px;
+    text-align: center;
+  }
+  .chord-name {
+    font-family: 'Orbitron', monospace;
+    font-size: 1.4rem;
+    font-weight: 700;
+    text-shadow: 0 0 20px var(--green);
+    letter-spacing: 0.1em;
+  }
+  .chord-ratio {
+    font-size: 0.6rem;
+    color: var(--green-dim);
+    margin-top: 2px;
+  }
+
+  /* note list */
+  .note-list {
+    margin-top: 8px;
+    font-size: 0.58rem;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+  .note-item {
+    display: flex;
+    justify-content: space-between;
+    padding: 2px 4px;
+    border-left: 2px solid transparent;
+    transition: all 0.1s;
+  }
+  .note-item.active {
+    border-left-color: var(--green);
+    background: rgba(0,255,65,0.05);
+    color: var(--green);
+  }
+  .note-item .cents {
+    color: var(--green-dim);
+    font-size: 0.5rem;
+  }
+
+  /* MAIN CANVAS */
+  .canvas-wrap {
+    grid-row: 2;
+    position: relative;
+    overflow: hidden;
+  }
+  canvas#main {
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
+
+  /* overlay mode labels */
+  .mode-label {
+    position: absolute;
+    top: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-family: 'Orbitron', monospace;
+    font-size: 0.5rem;
+    letter-spacing: 0.3em;
+    color: rgba(0,255,65,0.4);
+    pointer-events: none;
+  }
+
+  /* RIGHT PANEL — controls */
+  .panel-right {
+    grid-row: 2;
+    background: var(--panel);
+    border-left: 1px solid var(--green-dim);
+    padding: 12px 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    overflow-y: auto;
+  }
+
+  .ctrl-group {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+  }
+  .ctrl-group label {
+    font-size: 0.52rem;
+    color: var(--green-dim);
+    letter-spacing: 0.12em;
+  }
+  .ctrl-group input[type=range] {
+    width: 100%;
+    accent-color: var(--green);
+    height: 3px;
+  }
+  .ctrl-group .val {
+    font-size: 0.55rem;
+    color: var(--green);
+    text-align: right;
+  }
+
+  .btn {
+    background: transparent;
+    border: 1px solid var(--green-dim);
+    color: var(--green-dim);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.6rem;
+    padding: 6px 4px;
+    cursor: pointer;
+    letter-spacing: 0.1em;
+    transition: all 0.15s;
+    text-align: center;
+  }
+  .btn:hover, .btn.active {
+    border-color: var(--green);
+    color: var(--green);
+    box-shadow: 0 0 8px var(--green-glow);
+    background: rgba(0,255,65,0.04);
+  }
+  .btn-row {
+    display: flex;
+    gap: 4px;
+  }
+  .btn-row .btn { flex: 1; }
+
+  .mode-btns {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  select {
+    background: var(--bg);
+    border: 1px solid var(--green-dim);
+    color: var(--green);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.58rem;
+    padding: 4px;
+    width: 100%;
+  }
+
+  /* BOTTOM — waveform + spectrum */
+  .bottom-bar {
+    grid-column: 1/-1;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    border-top: 1px solid var(--green-dim);
+    background: var(--panel);
+  }
+  canvas#wave {
+    width: 100%;
+    height: 100%;
+    display: block;
+    border-right: 1px solid var(--green-dim);
+  }
+  canvas#spec {
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
+
+  /* file input hidden */
+  #fileIn { display: none; }
+
+  /* scanline overlay */
+  .scanlines {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    background: repeating-linear-gradient(
+      to bottom,
+      transparent 0px,
+      transparent 3px,
+      rgba(0,0,0,0.08) 3px,
+      rgba(0,0,0,0.08) 4px
+    );
+    z-index: 100;
+  }
+
+  /* pitch meter */
+  .pitch-meter {
+    margin-top: 6px;
+    font-size: 0.55rem;
+  }
+  .pitch-bar-bg {
+    width: 100%;
+    height: 4px;
+    background: rgba(0,255,65,0.1);
+    border-radius: 2px;
+    margin-top: 3px;
+    position: relative;
+    overflow: visible;
+  }
+  .pitch-needle {
+    position: absolute;
+    top: -4px;
+    width: 2px;
+    height: 12px;
+    background: var(--green);
+    border-radius: 1px;
+    transition: left 0.05s;
+    box-shadow: 0 0 6px var(--green);
+  }
+
+  .rms-display {
+    font-size: 0.55rem;
+    margin-top: 4px;
+  }
+  .rms-bar {
+    width: 100%;
+    height: 4px;
+    background: rgba(0,255,65,0.1);
+    border-radius: 2px;
+    margin-top: 3px;
+    overflow: hidden;
+  }
+  .rms-fill {
+    height: 100%;
+    background: linear-gradient(to right, var(--green-dim), var(--green));
+    transition: width 0.05s;
+    box-shadow: 0 0 4px var(--green);
+  }
+</style>
+</head>
+<body>
+
+<div class="scanlines"></div>
+
+<header>
+  <h1>HARMONIC GEOMETRY // AUDIOREACTIVE</h1>
+  <div class="status-row">
+    <div>SRC: <span id="srcLabel">--</span></div>
+    <div>FREQ: <span id="freqDisplay">-- Hz</span></div>
+    <div>NOTE: <span id="noteDisplay">--</span></div>
+    <div>CHORD: <span id="chordDisplay">--</span></div>
+    <div>RMS: <span id="rmsDisplay">-- dB</span></div>
+  </div>
+</header>
+
+<!-- LEFT: interval visualization -->
+<div class="panel-left">
+  <div class="panel-title">HARMONIC INTERVALS</div>
+  <div class="interval-container" id="intervalBars"></div>
+  <div class="chord-display">
+    <div class="chord-name" id="chordName">---</div>
+    <div class="chord-ratio" id="chordRatio">waiting for signal</div>
+  </div>
+  <div class="note-list" id="noteList"></div>
+  <div class="pitch-meter">
+    <span style="color:var(--green-dim)">CENTS DEVIATION</span>
+    <div class="pitch-bar-bg">
+      <div class="pitch-needle" id="centsNeedle" style="left:50%"></div>
+    </div>
+  </div>
+  <div class="rms-display">
+    <span style="color:var(--green-dim)">AMPLITUDE</span>
+    <div class="rms-bar"><div class="rms-fill" id="rmsFill" style="width:0%"></div></div>
+  </div>
+</div>
+
+<!-- MAIN CANVAS -->
+<div class="canvas-wrap">
+  <canvas id="main"></canvas>
+  <div class="mode-label" id="modeLabel">LISSAJOUS</div>
+</div>
+
+<!-- RIGHT: controls -->
+<div class="panel-right">
+  <div class="panel-title">VISUAL MODE</div>
+  <div class="mode-btns">
+    <button class="btn active" id="btnLiss" onclick="setMode('lissajous')">LISSAJOUS</button>
+    <button class="btn" id="btnVect" onclick="setMode('vectorfield')">VECTOR FIELD</button>
+    <button class="btn" id="btnManifold" onclick="setMode('manifold')">MANIFOLD</button>
+    <button class="btn" id="btnAll" onclick="setMode('combined')">COMBINED</button>
+  </div>
+
+  <div class="panel-title" style="margin-top:4px">PARAMETERS</div>
+  <div class="ctrl-group">
+    <label>PERSISTENCE</label>
+    <input type="range" id="ctrlPersist" min="0" max="99" value="85" oninput="this.nextElementSibling.textContent=this.value+'%'">
+    <div class="val">85%</div>
+  </div>
+  <div class="ctrl-group">
+    <label>LINE WIDTH</label>
+    <input type="range" id="ctrlWidth" min="1" max="30" value="8" step="1" oninput="this.nextElementSibling.textContent=(this.value/10).toFixed(1)">
+    <div class="val">0.8</div>
+  </div>
+  <div class="ctrl-group">
+    <label>ZOOM</label>
+    <input type="range" id="ctrlZoom" min="20" max="100" value="45" oninput="this.nextElementSibling.textContent=this.value+'%'">
+    <div class="val">45%</div>
+  </div>
+  <div class="ctrl-group">
+    <label>ROTATION SPEED</label>
+    <input type="range" id="ctrlRot" min="0" max="50" value="5" oninput="this.nextElementSibling.textContent=(this.value/10).toFixed(1)">
+    <div class="val">0.5</div>
+  </div>
+  <div class="ctrl-group">
+    <label>COLOR SHIFT</label>
+    <input type="range" id="ctrlHue" min="0" max="360" value="120" oninput="this.nextElementSibling.textContent=this.value+'°'">
+    <div class="val">120°</div>
+  </div>
+
+  <div class="panel-title" style="margin-top:4px">INPUT SOURCE</div>
+  <button class="btn" id="btnMic" onclick="startMic()">⬤ MIC INPUT</button>
+  <button class="btn" onclick="document.getElementById('fileIn').click()">▶ LOAD FILE</button>
+  <input type="file" id="fileIn" accept="audio/*" onchange="loadFile(this)">
+
+  <div class="panel-title" style="margin-top:4px">FFT SIZE</div>
+  <select id="fftSize" onchange="changeFFT(this.value)">
+    <option value="1024">1024</option>
+    <option value="2048" selected>2048</option>
+    <option value="4096">4096</option>
+    <option value="8192">8192</option>
+  </select>
+
+  <div class="panel-title" style="margin-top:4px">CHORD TEMPLATE</div>
+  <select id="chordMode">
+    <option value="just">Just Intonation</option>
+    <option value="equal">Equal Temperament</option>
+    <option value="pythagorean">Pythagorean</option>
+  </select>
+</div>
+
+<!-- BOTTOM: waveform + spectrum -->
+<div class="bottom-bar">
+  <canvas id="wave"></canvas>
+  <canvas id="spec"></canvas>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════
+// HARMONIC GEOMETRY ENGINE
+// ═══════════════════════════════════════════════════════════
+
+const NOTE_NAMES = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+
+// Just intonation ratios (intervals relative to root)
+const TUNING_SYSTEMS = {
+  just: {
+    ratios: [1, 16/15, 9/8, 6/5, 5/4, 4/3, 45/32, 3/2, 8/5, 5/3, 7/4, 15/8],
+    labels: ['1:1','16:15','9:8','6:5','5:4','4:3','45:32','3:2','8:5','5:3','7:4','15:8']
+  },
+  equal: {
+    ratios: Array.from({length:12}, (_,i) => Math.pow(2, i/12)),
+    labels: ['1','♭2','2','♭3','3','4','♯4','5','♭6','6','♭7','7']
+  },
+  pythagorean: {
+    ratios: [1, 256/243, 9/8, 32/27, 81/64, 4/3, 729/512, 3/2, 128/81, 27/16, 16/9, 243/128],
+    labels: ['1','256/243','9/8','32/27','81/64','4/3','729/512','3/2','128/81','27/16','16/9','243/128']
+  }
+};
+
+// Chord templates (intervals from root in semitones)
+const CHORD_TEMPLATES = [
+  { name:'MAJ',  intervals:[0,4,7],     color:'#00ff41' },
+  { name:'MIN',  intervals:[0,3,7],     color:'#44ff88' },
+  { name:'DOM7', intervals:[0,4,7,10],  color:'#ffaa00' },
+  { name:'MAJ7', intervals:[0,4,7,11],  color:'#00ffcc' },
+  { name:'MIN7', intervals:[0,3,7,10],  color:'#88ff44' },
+  { name:'DIM',  intervals:[0,3,6],     color:'#ff4400' },
+  { name:'AUG',  intervals:[0,4,8],     color:'#ff00aa' },
+  { name:'SUS2', intervals:[0,2,7],     color:'#00aaff' },
+  { name:'SUS4', intervals:[0,5,7],     color:'#aaffaa' },
+  { name:'ADD9', intervals:[0,4,7,14],  color:'#ffff00' },
+  { name:'MAJ6', intervals:[0,4,7,9],   color:'#00ff88' },
+  { name:'POWER',intervals:[0,7],       color:'#ff8800' },
+];
+
+// ═══════════════ Audio Engine ═══════════════
+let audioCtx, analyser, sourceNode, micStream;
+let fftSize = 2048;
+let dataFreq, dataTime;
+let isRunning = false;
+let currentMode = 'lissajous';
+let rotAngle = 0;
+
+// detected state
+let detectedFreq = 0;
+let detectedNote = -1;
+let detectedCents = 0;
+let detectedChord = null;
+let noteAmplitudes = new Array(12).fill(0);
+let rmsVal = 0;
+
+function initAudio(source) {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if (analyser) analyser.disconnect();
+  analyser = audioCtx.createAnalyser();
+  analyser.fftSize = fftSize;
+  analyser.smoothingTimeConstant = 0.8;
+  dataFreq = new Uint8Array(analyser.frequencyBinCount);
+  dataTime = new Float32Array(analyser.fftSize);
+  source.connect(analyser);
+  analyser.connect(audioCtx.destination);
+  if (!isRunning) { isRunning = true; loop(); }
+}
+
+async function startMic() {
+  try {
+    if (micStream) micStream.getTracks().forEach(t => t.stop());
+    if (!audioCtx) audioCtx = new AudioContext();
+    micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    const src = audioCtx.createMediaStreamSource(micStream);
+    initAudio(src);
+    document.getElementById('srcLabel').textContent = 'MICROPHONE';
+    document.getElementById('btnMic').classList.add('active');
+  } catch(e) {
+    alert('Mic access denied: ' + e.message);
+  }
+}
+
+function loadFile(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = async e => {
+    if (!audioCtx) audioCtx = new AudioContext();
+    const buffer = await audioCtx.decodeAudioData(e.target.result);
+    if (sourceNode) { try { sourceNode.stop(); } catch(err){} }
+    sourceNode = audioCtx.createBufferSource();
+    sourceNode.buffer = buffer;
+    sourceNode.loop = true;
+    initAudio(sourceNode);
+    sourceNode.start();
+    document.getElementById('srcLabel').textContent = file.name.slice(0,18);
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function changeFFT(val) {
+  fftSize = parseInt(val);
+  if (analyser) {
+    analyser.fftSize = fftSize;
+    dataFreq = new Uint8Array(analyser.frequencyBinCount);
+    dataTime = new Float32Array(analyser.fftSize);
+  }
+}
+
+// ═══════════════ Pitch Detection (Autocorrelation) ═══════════════
+function detectPitch() {
+  if (!analyser) return 0;
+  analyser.getFloatTimeDomainData(dataTime);
+  const sr = audioCtx.sampleRate;
+  const buf = dataTime;
+  const n = buf.length;
+
+  // RMS
+  let sumSq = 0;
+  for (let i = 0; i < n; i++) sumSq += buf[i]*buf[i];
+  rmsVal = Math.sqrt(sumSq/n);
+  if (rmsVal < 0.005) return 0;
+
+  // Autocorrelation
+  const minPeriod = Math.floor(sr / 1500);
+  const maxPeriod = Math.floor(sr / 50);
+  let bestPeriod = -1, bestCorr = -Infinity;
+
+  for (let p = minPeriod; p <= maxPeriod; p++) {
+    let corr = 0;
+    for (let i = 0; i < n - p; i++) corr += buf[i] * buf[i+p];
+    if (corr > bestCorr) { bestCorr = corr; bestPeriod = p; }
+  }
+
+  if (bestPeriod === -1 || bestCorr < 0.01) return 0;
+  return sr / bestPeriod;
+}
+
+// ═══════════════ Note / Chord Analysis ═══════════════
+function freqToNoteInfo(freq) {
+  if (freq <= 0) return { note: -1, cents: 0, name: '--' };
+  const A4 = 440;
+  const semis = 12 * Math.log2(freq / A4) + 69;
+  const noteIdx = Math.round(semis) % 12;
+  const cents = (semis - Math.round(semis)) * 100;
+  return { note: ((noteIdx % 12) + 12) % 12, cents, name: NOTE_NAMES[((noteIdx % 12)+12)%12] };
+}
+
+function analyzeHarmonics() {
+  if (!analyser) { noteAmplitudes = new Array(12).fill(0); return; }
+  analyser.getByteFrequencyData(dataFreq);
+  const sr = audioCtx.sampleRate;
+  const binHz = sr / analyser.fftSize;
+  const amps = new Array(12).fill(0);
+
+  for (let i = 1; i < dataFreq.length; i++) {
+    const f = i * binHz;
+    if (f < 50 || f > 4000) continue;
+    const A4 = 440;
+    const semis = 12 * Math.log2(f / A4) + 69;
+    const noteIdx = (((Math.round(semis) % 12) + 12) % 12);
+    const amp = dataFreq[i] / 255;
+    if (amp > amps[noteIdx]) amps[noteIdx] = amp;
+  }
+
+  // smooth
+  for (let i = 0; i < 12; i++) {
+    noteAmplitudes[i] = noteAmplitudes[i] * 0.85 + amps[i] * 0.15;
+  }
+}
+
+function detectChord() {
+  const threshold = 0.12;
+  const active = noteAmplitudes.map((a,i) => ({a,i})).filter(x => x.a > threshold);
+  if (active.length < 2) return null;
+
+  let bestChord = null, bestScore = -1;
+  for (let root = 0; root < 12; root++) {
+    for (const tmpl of CHORD_TEMPLATES) {
+      let score = 0;
+      for (const iv of tmpl.intervals) {
+        const noteIdx = (root + iv) % 12;
+        score += noteAmplitudes[noteIdx];
+      }
+      score /= tmpl.intervals.length;
+      if (score > bestScore) {
+        bestScore = score;
+        bestChord = { ...tmpl, root, rootName: NOTE_NAMES[root], score };
+      }
+    }
+  }
+  return bestScore > 0.1 ? bestChord : null;
+}
+
+// ═══════════════ Canvas Setup ═══════════════
+const mainCanvas = document.getElementById('main');
+const waveCanvas = document.getElementById('wave');
+const specCanvas = document.getElementById('spec');
+const mCtx = mainCanvas.getContext('2d');
+const wCtx = waveCanvas.getContext('2d');
+const sCtx = specCanvas.getContext('2d');
+
+function resizeCanvases() {
+  const cw = mainCanvas.parentElement;
+  mainCanvas.width = cw.clientWidth;
+  mainCanvas.height = cw.clientHeight;
+  waveCanvas.width = waveCanvas.parentElement.clientWidth / 2;
+  waveCanvas.height = waveCanvas.parentElement.clientHeight;
+  specCanvas.width = specCanvas.parentElement.clientWidth / 2;
+  specCanvas.height = specCanvas.parentElement.clientHeight;
+}
+window.addEventListener('resize', resizeCanvases);
+resizeCanvases();
+
+// ═══════════════ Visualization Renderers ═══════════════
+
+function drawLissajous(ctx, W, H, freqRatio, phase, amplitude, color, persist) {
+  const cx = W/2, cy = H/2;
+  const zoom = parseInt(document.getElementById('ctrlZoom').value) / 100;
+  const r = Math.min(W, H) * zoom;
+  const steps = 100;
+
+  // choose a/b from harmonic ratio
+  const [a, b] = getHarmonicRatioAB(freqRatio);
+
+  ctx.beginPath();
+  ctx.lineWidth = parseInt(document.getElementById('ctrlWidth').value) / 10;
+
+  const hue = parseInt(document.getElementById('ctrlHue').value);
+  const amp = 0.5 + amplitude * 0.5;
+
+  for (let i = 0; i <= steps; i++) {
+    const t = (i / steps) * Math.PI * 2 * Math.max(a, b);
+    const x = cx + r * amp * Math.sin(a * t + phase);
+    const y = cy + r * amp * Math.sin(b * t);
+    if (i === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  }
+
+  const progress = rotAngle % (Math.PI * 2) / (Math.PI * 2);
+  const sat = 70 + amplitude * 30;
+  const lit = 40 + amplitude * 30;
+  ctx.strokeStyle = `hsla(${hue}, ${sat}%, ${lit}%, ${0.4 + amplitude*0.5})`;
+  ctx.shadowColor = `hsl(${hue}, 100%, 60%)`;
+  ctx.shadowBlur = 8 + amplitude * 12;
+  ctx.stroke();
+  ctx.shadowBlur = 0;
+}
+
+function getHarmonicRatioAB(ratioIndex) {
+  const ratioMap = [
+    [1,1],[16,15],[9,8],[6,5],[5,4],[4,3],
+    [45,32],[3,2],[8,5],[5,3],[7,4],[15,8]
+  ];
+  return ratioMap[ratioIndex % 12];
+}
+
+function drawVectorField(ctx, W, H) {
+  if (!analyser) return;
+  const cx = W/2, cy = H/2;
+  const zoom = parseInt(document.getElementById('ctrlZoom').value) / 100;
+  const hue = parseInt(document.getElementById('ctrlHue').value);
+  const cols = 32, rows = 24;
+  const cw = W / cols, rh = H / rows;
+
+  analyser.getByteFrequencyData(dataFreq);
+  const sr = audioCtx.sampleRate;
+
+  ctx.lineWidth = 0.8;
+  for (let c = 0; c < cols; c++) {
+    for (let r = 0; r < rows; r++) {
+      const x = (c + 0.5) * cw;
+      const y = (r + 0.5) * rh;
+      const dx = x - cx, dy = y - cy;
+      const dist = Math.sqrt(dx*dx + dy*dy) / (Math.min(W,H)*0.5);
+
+      const binIdx = Math.floor((c / cols) * dataFreq.length * 0.5);
+      const amp = (dataFreq[Math.min(binIdx, dataFreq.length-1)] / 255) * zoom;
+
+      // angle: harmonically rotated by audio
+      const angle = Math.atan2(dy, dx) + rotAngle + amp * Math.PI * 2;
+      const len = (6 + amp * 30) * (1 - dist * 0.3);
+
+      const ex = x + Math.cos(angle) * len;
+      const ey = y + Math.sin(angle) * len;
+
+      const h = (hue + dist * 60 + amp * 120) % 360;
+      const alpha = 0.3 + amp * 0.7;
+      ctx.strokeStyle = `hsla(${h},80%,55%,${alpha})`;
+      ctx.shadowColor = `hsl(${h},100%,60%)`;
+      ctx.shadowBlur = amp * 6;
+
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      ctx.lineTo(ex, ey);
+      ctx.stroke();
+    }
+  }
+  ctx.shadowBlur = 0;
+}
+
+function drawManifold(ctx, W, H) {
+  if (!analyser) return;
+  analyser.getByteFrequencyData(dataFreq);
+  const cx = W/2, cy = H/2;
+  const zoom = parseInt(document.getElementById('ctrlZoom').value) / 100;
+  const hue = parseInt(document.getElementById('ctrlHue').value);
+  const r = Math.min(W,H) * zoom;
+  const spokes = 12;
+
+  // For each harmonic interval, draw a deformed manifold spoke
+  for (let s = 0; s < spokes; s++) {
+    const baseAngle = (s / spokes) * Math.PI * 2 + rotAngle;
+    const amp = noteAmplitudes[s];
+    const binStart = Math.floor(s/spokes * dataFreq.length * 0.3);
+    const binEnd = Math.floor((s+1)/spokes * dataFreq.length * 0.3);
+    let freqAmp = 0;
+    for (let b = binStart; b < binEnd; b++) freqAmp += dataFreq[b];
+    freqAmp /= (binEnd - binStart + 1) * 255;
+
+    const spokeR = r * (0.2 + amp * 0.8);
+    const points = 80;
+
+    ctx.beginPath();
+    for (let p = 0; p <= points; p++) {
+      const t = p / points;
+      const wobble = Math.sin(t * Math.PI * 8 + rotAngle * 3) * freqAmp * r * 0.15;
+      const pr = (t * spokeR) + wobble;
+      const pa = baseAngle + t * 0.3 * Math.sin(rotAngle + s);
+      const x = cx + Math.cos(pa) * pr;
+      const y = cy + Math.sin(pa) * pr;
+      p === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+    }
+
+    const h = (hue + s * 30 + freqAmp * 180) % 360;
+    ctx.strokeStyle = `hsla(${h}, 90%, 55%, ${0.3 + amp * 0.7})`;
+    ctx.lineWidth = 0.5 + amp * 2;
+    ctx.shadowColor = `hsl(${h}, 100%, 60%)`;
+    ctx.shadowBlur = amp * 10;
+    ctx.stroke();
+  }
+  ctx.shadowBlur = 0;
+}
+
+// ═══════════════ Main draw loop ═══════════════
+function loop() {
+  // Rotation speed
+  const rotSpeed = parseInt(document.getElementById('ctrlRot').value) / 10000;
+  rotAngle += rotSpeed;
+
+  // Detect pitch + harmonics
+  detectedFreq = detectPitch();
+  analyzeHarmonics();
+  const noteInfo = freqToNoteInfo(detectedFreq);
+  detectedNote = noteInfo.note;
+  detectedCents = noteInfo.cents;
+  detectedChord = detectChord();
+
+  const W = mainCanvas.width, H = mainCanvas.height;
+  const persist = parseInt(document.getElementById('ctrlPersist').value) / 100;
+
+  // Persistence fade
+  mCtx.fillStyle = `rgba(2, 8, 6, ${1 - persist})`;
+  mCtx.fillRect(0, 0, W, H);
+
+  // Draw based on mode
+  if (currentMode === 'lissajous' || currentMode === 'combined') {
+    // Draw Lissajous for each active note
+    for (let i = 0; i < 12; i++) {
+      if (noteAmplitudes[i] > 0.05) {
+        const phase = rotAngle * (1 + i * 0.1) + i * Math.PI / 6;
+        drawLissajous(mCtx, W, H, i, phase, noteAmplitudes[i], null, persist);
+      }
+    }
+    // Main detected pitch Lissajous with higher intensity
+    if (detectedNote >= 0 && rmsVal > 0.01) {
+      const phase = rotAngle + detectedCents / 100 * Math.PI;
+      drawLissajous(mCtx, W, H, detectedNote, phase, Math.min(rmsVal * 8, 1), null, persist);
+    }
+  }
+
+  if (currentMode === 'vectorfield' || currentMode === 'combined') {
+    drawVectorField(mCtx, W, H);
+  }
+
+  if (currentMode === 'manifold' || currentMode === 'combined') {
+    drawManifold(mCtx, W, H);
+  }
+
+  // ─── Waveform ───
+  const wW = waveCanvas.width, wH = waveCanvas.height;
+  wCtx.fillStyle = 'rgba(2,8,6,0.4)';
+  wCtx.fillRect(0,0,wW,wH);
+  if (analyser) {
+    analyser.getFloatTimeDomainData(dataTime);
+    wCtx.beginPath();
+    const slice = wW / dataTime.length;
+    const hue = parseInt(document.getElementById('ctrlHue').value);
+    wCtx.strokeStyle = `hsl(${hue}, 80%, 55%)`;
+    wCtx.lineWidth = 1;
+    wCtx.shadowColor = `hsl(${hue}, 100%, 60%)`;
+    wCtx.shadowBlur = 3;
+    for (let i = 0; i < dataTime.length; i++) {
+      const x = i * slice;
+      const y = wH/2 + dataTime[i] * wH/2 * 0.9;
+      i === 0 ? wCtx.moveTo(x,y) : wCtx.lineTo(x,y);
+    }
+    wCtx.stroke();
+    wCtx.shadowBlur = 0;
+  }
+
+  // ─── Spectrum ───
+  const sW = specCanvas.width, sH = specCanvas.height;
+  sCtx.fillStyle = 'rgba(2,8,6,0.4)';
+  sCtx.fillRect(0,0,sW,sH);
+  if (analyser) {
+    analyser.getByteFrequencyData(dataFreq);
+    const bars = Math.min(dataFreq.length, 256);
+    const bw = sW / bars;
+    const hue = parseInt(document.getElementById('ctrlHue').value);
+    for (let i = 0; i < bars; i++) {
+      const v = dataFreq[i] / 255;
+      const bh = v * sH;
+      const h = (hue + i/bars * 120) % 360;
+      sCtx.fillStyle = `hsla(${h}, 80%, 50%, 0.9)`;
+      sCtx.shadowColor = `hsl(${h},100%,60%)`;
+      sCtx.shadowBlur = v * 4;
+      sCtx.fillRect(i*bw, sH-bh, bw*0.8, bh);
+    }
+    sCtx.shadowBlur = 0;
+  }
+
+  // ─── Update UI ───
+  updateUI(noteInfo);
+
+  requestAnimationFrame(loop);
+}
+
+function updateUI(noteInfo) {
+  // header
+  if (detectedFreq > 0) {
+    document.getElementById('freqDisplay').textContent = detectedFreq.toFixed(1) + ' Hz';
+    document.getElementById('noteDisplay').textContent = noteInfo.name;
+  } else {
+    document.getElementById('freqDisplay').textContent = '-- Hz';
+    document.getElementById('noteDisplay').textContent = '--';
+  }
+
+  const rmsDb = rmsVal > 0 ? (20 * Math.log10(rmsVal)).toFixed(1) : '--';
+  document.getElementById('rmsDisplay').textContent = rmsDb + ' dB';
+
+  // chord
+  if (detectedChord) {
+    document.getElementById('chordDisplay').textContent = detectedChord.rootName + detectedChord.name;
+    document.getElementById('chordName').textContent = detectedChord.rootName + ' ' + detectedChord.name;
+    document.getElementById('chordName').style.color = detectedChord.color;
+    document.getElementById('chordName').style.textShadow = `0 0 20px ${detectedChord.color}`;
+    const tuning = TUNING_SYSTEMS[document.getElementById('chordMode').value];
+    const ivLabels = detectedChord.intervals.map(iv => tuning.labels[iv % 12]).join(' · ');
+    document.getElementById('chordRatio').textContent = ivLabels;
+  } else {
+    document.getElementById('chordDisplay').textContent = '--';
+    document.getElementById('chordName').textContent = '---';
+    document.getElementById('chordName').style.color = 'var(--green)';
+    document.getElementById('chordName').style.textShadow = '0 0 20px var(--green)';
+    document.getElementById('chordRatio').textContent = 'no chord detected';
+  }
+
+  // interval bars
+  updateIntervalBars();
+
+  // note list
+  updateNoteList();
+
+  // cents needle
+  const needlePct = 50 + detectedCents / 100 * 50;
+  document.getElementById('centsNeedle').style.left = needlePct.toFixed(1) + '%';
+
+  // RMS bar
+  document.getElementById('rmsFill').style.width = Math.min(rmsVal * 400, 100).toFixed(1) + '%';
+}
+
+function updateIntervalBars() {
+  const container = document.getElementById('intervalBars');
+  if (container.children.length === 0) {
+    const tuning = TUNING_SYSTEMS[document.getElementById('chordMode').value];
+    for (let i = 0; i < 12; i++) {
+      const wrap = document.createElement('div');
+      wrap.className = 'interval-bar-wrap';
+      wrap.innerHTML = `
+        <div class="interval-bar" id="ibar${i}"><div class="interval-fill" id="ifill${i}" style="height:0%"></div></div>
+        <div class="interval-label" id="ilbl${i}">${NOTE_NAMES[i]}</div>
+      `;
+      container.appendChild(wrap);
+    }
+  }
+
+  for (let i = 0; i < 12; i++) {
+    const fill = document.getElementById('ifill'+i);
+    const bar = document.getElementById('ibar'+i);
+    const amp = noteAmplitudes[i];
+    if (fill) fill.style.height = (amp * 100).toFixed(1) + '%';
+    if (bar) {
+      if (amp > 0.15) bar.classList.add('active');
+      else bar.classList.remove('active');
+    }
+  }
+}
+
+function updateNoteList() {
+  const list = document.getElementById('noteList');
+  const topNotes = noteAmplitudes
+    .map((a,i) => ({a,i,name:NOTE_NAMES[i]}))
+    .filter(x => x.a > 0.05)
+    .sort((a,b) => b.a - a.a)
+    .slice(0, 6);
+
+  list.innerHTML = topNotes.map(n => `
+    <div class="note-item ${n.a > 0.15 ? 'active' : ''}">
+      <span>${n.name}</span>
+      <span style="color:var(--green)">${('█'.repeat(Math.round(n.a*10))).padEnd(10,'░')}</span>
+      <span class="cents">${(n.a*100).toFixed(0)}%</span>
+    </div>
+  `).join('');
+}
+
+// ═══════════════ Mode control ═══════════════
+function setMode(mode) {
+  currentMode = mode;
+  document.querySelectorAll('.mode-btns .btn').forEach(b => b.classList.remove('active'));
+  const map = { lissajous:'btnLiss', vectorfield:'btnVect', manifold:'btnManifold', combined:'btnAll' };
+  document.getElementById(map[mode]).classList.add('active');
+  document.getElementById('modeLabel').textContent = mode.toUpperCase();
+
+  // Clear canvas on mode switch
+  mCtx.fillStyle = '#020806';
+  mCtx.fillRect(0, 0, mainCanvas.width, mainCanvas.height);
+}
+
+// ═══════════════ Idle animation (no audio) ═══════════════
+function idleLoop() {
+  if (isRunning) return;
+  const W = mainCanvas.width, H = mainCanvas.height;
+  const persist = 0.97;
+  mCtx.fillStyle = `rgba(2,8,6,${1-persist})`;
+  mCtx.fillRect(0,0,W,H);
+
+  // Show decorative Lissajous with random ratios
+  const t = Date.now() / 1000;
+  const fakeAmps = [0,0,0,4,0,0,7,0,0,0,0,0]; // major chord indices active
+  // Animate silently
+  for (let i of [3, 7]) {
+    const phase = t * 0.5 + i * 0.5;
+    const cx = W/2, cy = H/2;
+    const zoom = 0.45;
+    const r = Math.min(W,H)*zoom;
+    const [a,b] = getHarmonicRatioAB(i);
+    const steps = 1000;
+    mCtx.beginPath();
+    mCtx.lineWidth = 0.6;
+    for (let p = 0; p <= steps; p++) {
+      const tt = (p/steps)*Math.PI*2*Math.max(a,b);
+      const x = cx + r * 0.5 * Math.sin(a*tt+phase);
+      const y = cy + r * 0.5 * Math.sin(b*tt);
+      p === 0 ? mCtx.moveTo(x,y) : mCtx.lineTo(x,y);
+    }
+    mCtx.strokeStyle = `hsla(120,70%,40%,0.4)`;
+    mCtx.stroke();
+  }
+  rotAngle += 0.002;
+  requestAnimationFrame(idleLoop);
+}
+
+// Start idle
+loop();
+
+// Keyboard shortcuts
+document.addEventListener('keydown', e => {
+  const modes = ['lissajous','vectorfield','manifold','combined'];
+  const keys = {'1':'lissajous','2':'vectorfield','3':'manifold','4':'combined','m':null};
+  if (keys[e.key] && keys[e.key]) setMode(keys[e.key]);
+  if (e.key === 'm') startMic();
+});
+</script>
+</body>
+</html>

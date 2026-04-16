@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GEOMETRÍA DE CICLOS PERSISTENTES</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&display=swap');
+
+  :root {
+    --green: #00ff41;
+    --green-dim: #00aa2a;
+    --red: #ff3300;
+    --bg: #020806;
+    --panel: rgba(0,15,5,0.9);
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--green);
+    font-family: 'Share Tech Mono', monospace;
+    margin: 0;
+    height: 100vh;
+    display: grid;
+    grid-template-columns: 280px 1fr;
+    grid-template-rows: 50px 1fr;
+    overflow: hidden;
+  }
+
+  header {
+    grid-column: 1/-1;
+    border-bottom: 1px solid var(--green-dim);
+    display: flex;
+    align-items: center;
+    padding: 0 20px;
+    font-family: 'Orbitron';
+    font-size: 0.8rem;
+    letter-spacing: 2px;
+  }
+
+  .sidebar {
+    background: var(--panel);
+    border-right: 1px solid var(--green-dim);
+    padding: 15px;
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    overflow-y: auto;
+  }
+
+  .canvas-container {
+    position: relative;
+    background: radial-gradient(circle, #051a10 0%, #020806 100%);
+  }
+
+  canvas { width: 100%; height: 100%; display: block; }
+
+  .ctrl-group {
+    border: 1px solid rgba(0,255,65,0.2);
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .ctrl-title {
+    font-size: 0.6rem;
+    color: var(--green-dim);
+    margin-bottom: 5px;
+    text-transform: uppercase;
+  }
+
+  label { font-size: 0.7rem; display: flex; justify-content: space-between; }
+  
+  input[type=range] {
+    width: 100%;
+    accent-color: var(--green);
+  }
+
+  .osc-preview {
+    height: 40px;
+    background: rgba(0,0,0,0.3);
+    border: 1px solid var(--green-dim);
+  }
+</style>
+</head>
+<body>
+
+<header>ESTUDIO DE CICLOS PERSISTENTES // MORFOGÉNESIS X-Y</header>
+
+<div class="sidebar">
+  <div class="ctrl-group">
+    <div class="ctrl-title">Oscilador X (Fase/Morfosis)</div>
+    <label>Frecuencia <span>x1</span></label>
+    <input type="range" id="freqX" min="1" max="12" step="1" value="1">
+    <label>Morph (Seno -> Sierra) <span id="valMorphX">0%</span></label>
+    <input type="range" id="morphX" min="0" max="1" step="0.01" value="0.5">
+    <canvas id="preX" class="osc-preview"></canvas>
+  </div>
+
+  <div class="ctrl-group">
+    <div class="ctrl-title">Oscilador Y (Referencia)</div>
+    <label>Frecuencia <span>x1</span></label>
+    <input type="range" id="freqY" min="1" max="12" step="1" value="1">
+    <label>Fase <span>+90°</span></label>
+    <input type="range" id="phaseY" min="0" max="6.28" step="0.01" value="1.57">
+    <canvas id="preY" class="osc-preview"></canvas>
+  </div>
+
+  <div class="ctrl-group">
+    <div class="ctrl-title">Visualización</div>
+    <label>Persistencia</label>
+    <input type="range" id="persist" min="0" max="0.99" step="0.01" value="0.85">
+    <label>Grosor Lineal</label>
+    <input type="range" id="lWidth" min="0.5" max="5" step="0.1" value="1.2">
+  </div>
+</div>
+
+<div class="canvas-container">
+  <canvas id="main"></canvas>
+</div>
+
+<script>
+  const main = document.getElementById('main');
+  const ctx = main.getContext('2d');
+  const preX = document.getElementById('preX').getContext('2d');
+  const preY = document.getElementById('preY').getContext('2d');
+
+  let width, height;
+  let time = 0;
+
+  function resize() {
+    width = main.width = main.clientWidth;
+    height = main.height = main.clientHeight;
+    preX.canvas.width = preX.canvas.clientWidth;
+    preX.canvas.height = preX.canvas.clientHeight;
+    preY.canvas.width = preY.canvas.clientWidth;
+    preY.canvas.height = preY.canvas.clientHeight;
+  }
+  window.onresize = resize;
+  resize();
+
+  // Función de Onda con Morphing (Clave de la imagen)
+  function oscillator(t, freq, morph) {
+    const sine = Math.sin(t * freq);
+    // Sierra basada en armónicos o función ramp
+    const saw = 2 * ( (t * freq / (2 * Math.PI)) % 1 ) - 1;
+    // Interpolación lineal entre Seno y Sierra
+    return sine * (1 - morph) + saw * morph;
+  }
+
+  function loop() {
+    const p = document.getElementById('persist').value;
+    ctx.fillStyle = `rgba(2, 8, 6, ${1 - p})`;
+    ctx.fillRect(0, 0, width, height);
+
+    const fX = parseFloat(document.getElementById('freqX').value);
+    const mX = parseFloat(document.getElementById('morphX').value);
+    const fY = parseFloat(document.getElementById('freqY').value);
+    const pY = parseFloat(document.getElementById('phaseY').value);
+    const lw = parseFloat(document.getElementById('lWidth').value);
+
+    document.getElementById('valMorphX').innerText = (mX * 100).toFixed(0) + "%";
+
+    const zoom = Math.min(width, height) * 0.35;
+    const steps = 500;
+    
+    ctx.beginPath();
+    ctx.strokeStyle = '#ff3300'; // Color de la imagen
+    ctx.lineWidth = lw;
+    ctx.shadowBlur = 5;
+    ctx.shadowColor = '#ff3300';
+
+    for(let i=0; i <= steps; i++) {
+      const localTime = time + (i * 0.02);
+      // X es la onda con morphing (la "sierra" deformada de la imagen)
+      const x = oscillator(localTime, fX, mX);
+      // Y es la onda de referencia (senoidal pura + fase)
+      const y = Math.sin(localTime * fY + pY);
+
+      const posX = width/2 + x * zoom;
+      const posY = height/2 + y * zoom;
+
+      if(i===0) ctx.moveTo(posX, posY);
+      else ctx.lineTo(posX, posY);
+    }
+    ctx.stroke();
+
+    // Dibujar previews de onda
+    drawPreview(preX, fX, mX);
+    drawPreview(preY, fY, 0, pY);
+
+    time += 0.05;
+    requestAnimationFrame(loop);
+  }
+
+  function drawPreview(pCtx, freq, morph, phase = 0) {
+    const w = pCtx.canvas.width;
+    const h = pCtx.canvas.height;
+    pCtx.clearRect(0,0,w,h);
+    pCtx.beginPath();
+    pCtx.strokeStyle = '#00ff41';
+    for(let i=0; i<w; i++) {
+      const t = (i/w) * Math.PI * 2;
+      const v = oscillator(t, 1, morph); // Visualizamos 1 ciclo
+      const x = i;
+      const y = h/2 + v * (h/2.5);
+      if(i===0) pCtx.moveTo(x,y); else pCtx.lineTo(x,y);
+    }
+    pCtx.stroke();
+  }
+
+  loop();
+</script>
+</body>
+</html>

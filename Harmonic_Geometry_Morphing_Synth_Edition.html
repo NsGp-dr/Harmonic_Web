@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GEOMETRÍA ARMÓNICA // SYNTH</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&display=swap');
+
+  :root {
+    --green: #00ff41;
+    --green-dim: #00aa2a;
+    --red: #ff3300;
+    --bg: #020806;
+    --panel: rgba(0,15,5,0.95);
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--green);
+    font-family: 'Share Tech Mono', monospace;
+    margin: 0;
+    height: 100vh;
+    display: grid;
+    grid-template-columns: 320px 1fr;
+    grid-template-rows: 50px 1fr;
+    overflow: hidden;
+  }
+
+  header {
+    grid-column: 1/-1;
+    border-bottom: 1px solid var(--green-dim);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 20px;
+    font-family: 'Orbitron';
+    font-size: 0.8rem;
+    letter-spacing: 2px;
+  }
+
+  .sidebar {
+    background: var(--panel);
+    border-right: 1px solid var(--green-dim);
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    overflow-y: auto;
+    font-size: 0.7rem;
+  }
+
+  .canvas-container { position: relative; background: #000; }
+  canvas { width: 100%; height: 100%; display: block; }
+
+  .osc-panel {
+    border: 1px solid rgba(0,255,65,0.3);
+    padding: 10px;
+    background: rgba(0,20,10,0.5);
+  }
+
+  .ctrl-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-top: 5px;
+  }
+
+  .knob-wrap { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+  
+  input[type=range] { width: 100%; accent-color: var(--green); }
+  
+  .btn-audio {
+    background: var(--green);
+    color: black;
+    border: none;
+    padding: 10px;
+    font-family: 'Orbitron';
+    font-weight: bold;
+    cursor: pointer;
+    margin-bottom: 10px;
+  }
+
+  .metrics {
+    font-size: 0.6rem;
+    color: var(--red);
+    border-top: 1px solid var(--green-dim);
+    margin-top: 10px;
+    padding-top: 5px;
+  }
+</style>
+</head>
+<body>
+
+<header>
+    <div>HARMONIC MORPHOLOGY // OSCILLATOR ANALYSIS</div>
+    <div id="chordScoreDisplay" style="color:var(--red)">COHERENCE: 0.00</div>
+</header>
+
+<div class="sidebar">
+  <button class="btn-audio" id="audioToggle">START AUDIO ENGINE</button>
+
+  <div class="osc-panel">
+    <div style="color:var(--green-dim); font-weight:bold">OSC 1 (X - Morphing)</div>
+    <div class="ctrl-grid">
+      <div class="knob-wrap"><label>GAIN</label><input type="range" id="gain1" min="0" max="1" step="0.01" value="0.5"></div>
+      <div class="knob-wrap"><label>PAN</label><input type="range" id="pan1" min="-1" max="1" step="0.1" value="-0.5"></div>
+      <div class="knob-wrap"><label>OCTAVE</label><input type="range" id="oct1" min="-2" max="2" step="1" value="0"></div>
+      <div class="knob-wrap"><label>FINE</label><input type="range" id="fine1" min="-100" max="100" step="1" value="0"></div>
+      <div class="knob-wrap"><label>UNISON</label><input type="range" id="uni1" min="1" max="5" step="1" value="1"></div>
+      <div class="knob-wrap"><label>FRAME (Morph)</label><input type="range" id="frame1" min="0" max="1" step="0.01" value="0.5"></div>
+      <div class="knob-wrap"><label>PHASE</label><input type="range" id="phase1" min="0" max="360" step="1" value="0"></div>
+      <div class="knob-wrap"><label>PHASE RAND</label><input type="range" id="rand1" min="0" max="1" step="0.1" value="0"></div>
+    </div>
+  </div>
+
+  <div class="osc-panel">
+    <div style="color:var(--green-dim); font-weight:bold">OSC 2 (Y - Reference)</div>
+    <div class="ctrl-grid">
+      <div class="knob-wrap"><label>GAIN</label><input type="range" id="gain2" min="0" max="1" step="0.01" value="0.5"></div>
+      <div class="knob-wrap"><label>PAN</label><input type="range" id="pan2" min="-1" max="1" step="0.1" value="0.5"></div>
+      <div class="knob-wrap"><label>OCTAVE</label><input type="range" id="oct2" min="-2" max="2" step="1" value="0"></div>
+      <div class="knob-wrap"><label>PHASE</label><input type="range" id="phase2" min="0" max="360" step="1" value="90"></div>
+    </div>
+  </div>
+
+  <div class="metrics" id="metricsPanel">
+    MÉTRICAS DE COHERENCIA:<br>
+    - Persistent Cycles: <span id="pCycles">0</span><br>
+    - Harmonic Dev: <span id="hDev">0.0</span>
+  </div>
+</div>
+
+<div class="canvas-container">
+  <canvas id="main"></canvas>
+</div>
+
+<script>
+  let audioCtx, osc1, osc2, gainNode1, gainNode2, panner1, panner2;
+  let isPlaying = false;
+  const canvas = document.getElementById('main');
+  const ctx = canvas.getContext('2d');
+
+  // Inicialización de Audio
+  function initAudio() {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    
+    // OSC 1 setup
+    osc1 = audioCtx.createOscillator();
+    gainNode1 = audioCtx.createGain();
+    panner1 = audioCtx.createStereoPanner();
+    osc1.type = 'sine'; 
+    osc1.connect(gainNode1).connect(panner1).connect(audioCtx.destination);
+    
+    // OSC 2 setup
+    osc2 = audioCtx.createOscillator();
+    gainNode2 = audioCtx.createGain();
+    panner2 = audioCtx.createStereoPanner();
+    osc2.connect(gainNode2).connect(panner2).connect(audioCtx.destination);
+
+    osc1.start();
+    osc2.start();
+  }
+
+  // Lógica de Puntuación de Plantilla (Template Scoring)
+  // Mide la coherencia entre la relación de frecuencias y la estabilidad visual
+  function calculateCoherence(f1, f2, morph) {
+    const ratio = f1 / f2;
+    // Puntuación basada en qué tan cerca está la relación de un número racional simple
+    const score = Math.abs(Math.sin(Math.PI * ratio)) < 0.05 ? 1.0 : (1 / (1 + morph));
+    return score.toFixed(2);
+  }
+
+  function loop() {
+    const W = canvas.width = canvas.clientWidth;
+    const H = canvas.height = canvas.clientHeight;
+
+    // Persistencia (Fondo translúcido)
+    ctx.fillStyle = 'rgba(0, 5, 2, 0.1)';
+    ctx.fillRect(0, 0, W, H);
+
+    if (isPlaying) {
+      const baseFreq = 110; // A2
+      
+      // Update OSC 1 (X)
+      const f1 = baseFreq * Math.pow(2, parseInt(document.getElementById('oct1').value)) + parseInt(document.getElementById('fine1').value);
+      osc1.frequency.setTargetAtTime(f1, audioCtx.currentTime, 0.1);
+      gainNode1.gain.value = document.getElementById('gain1').value;
+      panner1.pan.value = document.getElementById('pan1').value;
+      
+      // Update OSC 2 (Y)
+      const f2 = baseFreq * Math.pow(2, parseInt(document.getElementById('oct2').value));
+      osc2.frequency.setTargetAtTime(f2, audioCtx.currentTime, 0.1);
+      gainNode2.gain.value = document.getElementById('gain2').value;
+      panner2.pan.value = document.getElementById('pan2').value;
+
+      // Morfogénesis Visual (Lissajous Deformado)
+      const morph = parseFloat(document.getElementById('frame1').value);
+      const phase1 = parseFloat(document.getElementById('phase1').value) * Math.PI / 180;
+      const phase2 = parseFloat(document.getElementById('phase2').value) * Math.PI / 180;
+      
+      const score = calculateCoherence(f1, f2, morph);
+      document.getElementById('chordScoreDisplay').innerText = `COHERENCE: ${score}`;
+
+      drawGeometry(W, H, f1/f2, morph, phase1, phase2);
+    }
+
+    requestAnimationFrame(loop);
+  }
+
+  function drawGeometry(W, H, ratio, morph, p1, p2) {
+    const steps = 1500;
+    const zoom = Math.min(W, H) * 0.4;
+    ctx.beginPath();
+    ctx.strokeStyle = '#ff3300';
+    ctx.lineWidth = 1.5;
+    ctx.shadowBlur = 10;
+    ctx.shadowColor = '#ff3300';
+
+    for(let i=0; i <= steps; i++) {
+      const t = (i / steps) * Math.PI * 2 * 10;
+      
+      // X con Morphing (Mezcla de Seno y Sierra según la imagen)
+      let xRaw = Math.sin(t * ratio + p1);
+      const saw = 2 * ((t * ratio / (2 * Math.PI)) % 1) - 1;
+      xRaw = xRaw * (1 - morph) + saw * morph;
+
+      // Y como referencia (Seno puro)
+      const yRaw = Math.sin(t + p2);
+
+      ctx.lineTo(W/2 + xRaw * zoom, H/2 + yRaw * zoom);
+    }
+    ctx.stroke();
+  }
+
+  document.getElementById('audioToggle').addEventListener('click', () => {
+    if (!isPlaying) {
+      initAudio();
+      isPlaying = true;
+      document.getElementById('audioToggle').innerText = "STOP ENGINE";
+    } else {
+      audioCtx.close();
+      isPlaying = false;
+      document.getElementById('audioToggle').innerText = "START ENGINE";
+    }
+  });
+
+  loop();
+</script>
+</body>
+</html>

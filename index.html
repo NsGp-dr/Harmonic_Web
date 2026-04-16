@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HARMONIC WEB // NsGp</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&display=swap');
+
+  :root {
+    --g: #00ff41;
+    --gd: #00aa2a;
+    --r: #ff3300;
+    --bg: #020806;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--g);
+    font-family: 'Share Tech Mono', monospace;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 48px;
+    overflow: hidden;
+    position: relative;
+  }
+
+  /* Scanlines */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(0,255,65,0.015) 2px,
+      rgba(0,255,65,0.015) 4px
+    );
+    pointer-events: none;
+    z-index: 10;
+  }
+
+  /* Grid bg */
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(0,255,65,0.04) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,255,65,0.04) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+  }
+
+  header {
+    text-align: center;
+    z-index: 1;
+  }
+
+  .title {
+    font-family: 'Orbitron', monospace;
+    font-size: clamp(1.4rem, 4vw, 2.2rem);
+    font-weight: 900;
+    letter-spacing: 6px;
+    color: var(--g);
+    text-shadow: 0 0 20px rgba(0,255,65,0.5);
+  }
+
+  .subtitle {
+    font-size: 0.65rem;
+    color: var(--gd);
+    letter-spacing: 5px;
+    margin-top: 8px;
+  }
+
+  .divider {
+    width: 200px;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--gd), transparent);
+    margin: 14px auto 0;
+  }
+
+  /* CARDS GRID */
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 16px;
+    width: min(900px, 92vw);
+    z-index: 1;
+  }
+
+  .card {
+    border: 1px solid rgba(0,255,65,0.2);
+    background: rgba(0,15,5,0.85);
+    padding: 24px 20px;
+    text-decoration: none;
+    color: var(--g);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    position: relative;
+    overflow: hidden;
+    transition: border-color .2s, transform .15s;
+    cursor: pointer;
+  }
+
+  .card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: -100%;
+    width: 100%; height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(0,255,65,0.06), transparent);
+    transition: left .4s;
+  }
+
+  .card:hover { border-color: var(--g); transform: translateY(-2px); }
+  .card:hover::before { left: 100%; }
+
+  .card-id {
+    font-size: 0.55rem;
+    color: var(--r);
+    letter-spacing: 3px;
+  }
+
+  .card-title {
+    font-family: 'Orbitron', monospace;
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 2px;
+    line-height: 1.4;
+    text-shadow: 0 0 10px rgba(0,255,65,0.3);
+  }
+
+  .card-desc {
+    font-size: 0.6rem;
+    color: var(--gd);
+    line-height: 1.6;
+  }
+
+  .card-arrow {
+    font-size: 0.65rem;
+    color: var(--r);
+    margin-top: auto;
+    letter-spacing: 2px;
+    transition: letter-spacing .2s;
+  }
+  .card:hover .card-arrow { letter-spacing: 5px; }
+
+  footer {
+    font-size: 0.55rem;
+    color: rgba(0,255,65,0.2);
+    letter-spacing: 3px;
+    z-index: 1;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="title">HARMONIC WEB</div>
+  <div class="subtitle">VISUAL · SYNTHESIS · GEOMETRY</div>
+  <div class="divider"></div>
+</header>
+
+<div class="grid">
+
+  <a class="card" href="Harmonic_Geometry.html">
+    <div class="card-id">MOD_01</div>
+    <div class="card-title">HARMONIC<br>GEOMETRY</div>
+    <div class="card-desc">Figuras de Lissajous y morfogénesis de osciladores X-Y en tiempo real.</div>
+    <div class="card-arrow">LAUNCH →</div>
+  </a>
+
+  <a class="card" href="Harmonic_Geometry_Persistent_Cycles_Edition.html">
+    <div class="card-id">MOD_02</div>
+    <div class="card-title">PERSISTENT<br>CYCLES</div>
+    <div class="card-desc">Trazado persistente con morphing Seno → Sierra. Estudio de ciclos y fase.</div>
+    <div class="card-arrow">LAUNCH →</div>
+  </a>
+
+  <a class="card" href="Harmonic_Geometry_Morphing_Synth_Edition.html">
+    <div class="card-id">MOD_03</div>
+    <div class="card-title">MORPHING<br>SYNTH</div>
+    <div class="card-desc">Oscilador dual con síntesis de audio en vivo y métricas de coherencia armónica.</div>
+    <div class="card-arrow">LAUNCH →</div>
+  </a>
+
+  <a class="card" href="Water_glass.html">
+    <div class="card-id">MOD_04</div>
+    <div class="card-title">GLASS<br>PERCUSSION</div>
+    <div class="card-desc">Simulación acústica de vaso de agua. Nivel → frecuencia. Ripples y waveform.</div>
+    <div class="card-arrow">LAUNCH →</div>
+  </a>
+
+</div>
+
+<footer>NsGp-dr // HARMONIC WEB // GITHUB PAGES</footer>
+
+</body>
+</html>

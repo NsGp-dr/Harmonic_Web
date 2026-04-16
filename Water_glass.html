@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Glass Percussion</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: #0a0a0f;
+    color: #e0ddd5;
+    font-family: 'Space Mono', monospace;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    gap: 28px;
+    overflow: hidden;
+  }
+
+  h1 {
+    font-size: 11px;
+    letter-spacing: 6px;
+    text-transform: uppercase;
+    color: #555;
+  }
+
+  /* GLASS */
+  .glass-wrap {
+    position: relative;
+    width: 160px;
+    height: 220px;
+  }
+
+  #glassCanvas {
+    position: absolute;
+    top: 0; left: 0;
+    border-radius: 4px;
+  }
+
+  /* SLIDER */
+  .slider-row {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    font-size: 10px;
+    letter-spacing: 2px;
+    color: #666;
+  }
+
+  input[type=range] {
+    -webkit-appearance: none;
+    width: 160px;
+    height: 3px;
+    background: #222;
+    border-radius: 2px;
+    outline: none;
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 14px; height: 14px;
+    border-radius: 50%;
+    background: #7eb8c9;
+    cursor: pointer;
+    transition: background .2s;
+  }
+  input[type=range]:hover::-webkit-slider-thumb { background: #aee0f0; }
+
+  /* BUTTON */
+  #hitBtn {
+    width: 72px; height: 72px;
+    border-radius: 50%;
+    border: 2px solid #3a3a4a;
+    background: #12121a;
+    color: #7eb8c9;
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 2px;
+    cursor: pointer;
+    transition: all .08s;
+    user-select: none;
+    position: relative;
+    overflow: hidden;
+  }
+  #hitBtn::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    background: radial-gradient(circle at center, rgba(126,184,201,.18) 0%, transparent 70%);
+    opacity: 0;
+    transition: opacity .08s;
+  }
+  #hitBtn:active { transform: scale(.92); border-color: #7eb8c9; }
+  #hitBtn:active::after { opacity: 1; }
+  #hitBtn.triggered { border-color: #aee0f0; box-shadow: 0 0 18px rgba(126,184,201,.35); }
+
+  .note-display {
+    font-size: 10px;
+    letter-spacing: 3px;
+    color: #7eb8c9;
+    height: 14px;
+    transition: opacity .3s;
+  }
+
+  /* WAVEFORM */
+  #waveCanvas {
+    width: 260px;
+    height: 50px;
+    opacity: .7;
+  }
+</style>
+</head>
+<body>
+
+<h1>Glass Percussion</h1>
+
+<div class="glass-wrap">
+  <canvas id="glassCanvas" width="160" height="220"></canvas>
+</div>
+
+<div class="slider-row">
+  <span>EMPTY</span>
+  <input type="range" id="waterSlider" min="0" max="100" value="50">
+  <span>FULL</span>
+</div>
+
+<button id="hitBtn">HIT</button>
+
+<div class="note-display" id="noteDisplay"></div>
+<canvas id="waveCanvas" width="260" height="50"></canvas>
+
+<script>
+// ── Audio Context ──────────────────────────────────────────────
+const AC = new (window.AudioContext || window.webkitAudioContext)();
+
+function playGlass(level) {
+  // More water = lower frequency (denser medium)
+  const freq = 1400 - level * 10; // 400 Hz (full) → 1400 Hz (empty)
+  const gain = AC.createGain();
+  const osc  = AC.createOscillator();
+  const dist = AC.createWaveShaper();
+
+  // Slight distortion for glass timbre
+  const curve = new Float32Array(256);
+  for (let i = 0; i < 256; i++) {
+    const x = (i * 2) / 256 - 1;
+    curve[i] = (Math.PI + 80) * x / (Math.PI + 80 * Math.abs(x));
+  }
+  dist.curve = curve;
+
+  osc.type = 'sine';
+  osc.frequency.setValueAtTime(freq, AC.currentTime);
+  osc.frequency.exponentialRampToValueAtTime(freq * 0.98, AC.currentTime + 1.2);
+
+  gain.gain.setValueAtTime(0.5, AC.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.001, AC.currentTime + 1.8);
+
+  osc.connect(dist);
+  dist.connect(gain);
+  gain.connect(AC.destination);
+
+  osc.start();
+  osc.stop(AC.currentTime + 1.8);
+  return freq;
+}
+
+// ── Note name from frequency ───────────────────────────────────
+function freqToNote(f) {
+  const notes = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+  const n = Math.round(12 * Math.log2(f / 440)) + 69;
+  return notes[n % 12] + Math.floor(n / 12 - 1);
+}
+
+// ── Glass Canvas ───────────────────────────────────────────────
+const gc   = document.getElementById('glassCanvas');
+const gctx = gc.getContext('2d');
+const W = gc.width, H = gc.height;
+
+let waterLevel = 0.5;  // 0=empty 1=full
+let ripples    = [];   // {t, x, y, maxR}
+
+function drawGlass() {
+  gctx.clearRect(0, 0, W, H);
+
+  // Glass silhouette (trapezoid)
+  const top = 18, bot = H - 10;
+  const lTop = 18, rTop = W - 18;
+  const lBot = 26, rBot = W - 26;
+
+  // Water fill height
+  const waterH  = (bot - top) * waterLevel;
+  const waterY  = bot - waterH;
+
+  // Water body
+  gctx.save();
+  gctx.beginPath();
+  // clip to glass interior
+  gctx.moveTo(lTop, top);
+  gctx.lineTo(rTop, top);
+  gctx.lineTo(rBot, bot);
+  gctx.lineTo(lBot, bot);
+  gctx.closePath();
+  gctx.clip();
+
+  // Gradient water
+  const wg = gctx.createLinearGradient(0, waterY, 0, bot);
+  wg.addColorStop(0, 'rgba(80,160,200,0.55)');
+  wg.addColorStop(1, 'rgba(30,90,140,0.85)');
+  gctx.fillStyle = wg;
+  gctx.fillRect(0, waterY, W, bot - waterY);
+
+  // Ripples on water surface
+  ripples.forEach(r => {
+    const age    = (Date.now() - r.t) / 1000;
+    const radius = age * 90;
+    const alpha  = Math.max(0, 0.6 - age * 0.8);
+    if (alpha <= 0) return;
+    gctx.beginPath();
+    gctx.ellipse(r.x, waterY + 2, radius, radius * 0.22, 0, 0, Math.PI * 2);
+    gctx.strokeStyle = `rgba(180,230,255,${alpha})`;
+    gctx.lineWidth = 1.5;
+    gctx.stroke();
+  });
+
+  gctx.restore();
+
+  // Glass outline
+  gctx.beginPath();
+  gctx.moveTo(lTop, top);
+  gctx.lineTo(rTop, top);
+  gctx.lineTo(rBot, bot);
+  gctx.lineTo(lBot, bot);
+  gctx.closePath();
+  gctx.strokeStyle = 'rgba(200,220,240,0.35)';
+  gctx.lineWidth = 2;
+  gctx.stroke();
+
+  // Glass rim highlight
+  gctx.beginPath();
+  gctx.moveTo(lTop + 2, top);
+  gctx.lineTo(rTop - 2, top);
+  gctx.strokeStyle = 'rgba(255,255,255,0.5)';
+  gctx.lineWidth = 1;
+  gctx.stroke();
+
+  // Shine stripe
+  gctx.beginPath();
+  gctx.moveTo(lTop + 8, top + 10);
+  gctx.lineTo(lBot + 8, bot - 8);
+  gctx.strokeStyle = 'rgba(255,255,255,0.12)';
+  gctx.lineWidth = 5;
+  gctx.stroke();
+}
+
+// ── Waveform Canvas ────────────────────────────────────────────
+const wc   = document.getElementById('waveCanvas');
+const wctx = wc.getContext('2d');
+let waveAmp   = 0;
+let waveFreq  = 880;
+let wavePhase = 0;
+let waveDecay = 0;
+
+function drawWave() {
+  wctx.clearRect(0, 0, wc.width, wc.height);
+  if (waveAmp < 0.005) return;
+  wctx.beginPath();
+  const mid = wc.height / 2;
+  for (let x = 0; x < wc.width; x++) {
+    const t = x / wc.width;
+    const y = mid + Math.sin(t * waveFreq * 0.04 + wavePhase) * waveAmp * mid * 0.85;
+    x === 0 ? wctx.moveTo(x, y) : wctx.lineTo(x, y);
+  }
+  wctx.strokeStyle = `rgba(126,184,201,${waveAmp})`;
+  wctx.lineWidth = 1.5;
+  wctx.stroke();
+}
+
+// ── Animation loop ─────────────────────────────────────────────
+function loop() {
+  // Prune old ripples
+  ripples = ripples.filter(r => (Date.now() - r.t) < 1200);
+  wavePhase += 0.12;
+  waveAmp   *= 0.975;
+  drawGlass();
+  drawWave();
+  requestAnimationFrame(loop);
+}
+loop();
+
+// ── Controls ───────────────────────────────────────────────────
+const slider  = document.getElementById('waterSlider');
+const btn     = document.getElementById('hitBtn');
+const noteEl  = document.getElementById('noteDisplay');
+
+slider.addEventListener('input', () => {
+  waterLevel = slider.value / 100;
+});
+
+function hit() {
+  if (AC.state === 'suspended') AC.resume();
+
+  const freq = playGlass(slider.value);
+  waveAmp    = 1;
+  waveFreq   = freq;
+  waveDecay  = 0.975;
+
+  // Ripple at center of water surface
+  const top  = 18, bot = 210;
+  const wY   = bot - (bot - top) * waterLevel;
+  ripples.push({ t: Date.now(), x: W / 2, y: wY });
+
+  noteEl.textContent = freqToNote(freq) + '  ' + Math.round(freq) + ' Hz';
+  setTimeout(() => { noteEl.textContent = ''; }, 1500);
+
+  btn.classList.add('triggered');
+  setTimeout(() => btn.classList.remove('triggered'), 120);
+}
+
+btn.addEventListener('click', hit);
+document.addEventListener('keydown', e => {
+  if (e.code === 'Space' && !e.repeat) { e.preventDefault(); hit(); }
+});
+</script>
+</body>
+</html>
