@@ -85,7 +85,8 @@ Cada banda conduce una capa de deformación espacialmente independiente. La suma
 
 ## Autor
 
-**Nicolás Giraldo** · [@NsGp-dr](https://github.com/NsGp-dr)[mail](nicolasantiagog@gmail.com)
+**Nicolás Giraldo** · [@NsGp-dr](https://github.com/NsGp-dr)
+[mail](nicolasantiagog@gmail.com)
 Bogotá, Colombia
 
 Investigación en visualización de datos, sonificación y análisis topológico aplicado a señales.
