@@ -1,0 +1,537 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Harmonic Web</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #030409;
+    --c1: #00ffe0;
+    --c2: #ff2d78;
+    --c3: #ffe600;
+    --c4: #7b2fff;
+    --ui: rgba(0,255,224,0.6);
+    --font: 'Share Tech Mono', monospace;
+  }
+
+  body {
+    background: var(--bg);
+    width: 100vw; height: 100vh;
+    overflow: hidden;
+    font-family: var(--font);
+    color: var(--c1);
+  }
+
+  canvas {
+    display: block;
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+  }
+
+  /* HUD */
+  #hud {
+    position: fixed;
+    top: 18px; left: 22px;
+    z-index: 10;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    pointer-events: none;
+  }
+
+  #hud .title {
+    font-size: 11px;
+    letter-spacing: 0.25em;
+    text-transform: uppercase;
+    color: var(--c1);
+    opacity: 0.5;
+  }
+
+  #hud .big {
+    font-size: 20px;
+    letter-spacing: 0.15em;
+    color: var(--c1);
+    text-shadow: 0 0 14px var(--c1);
+  }
+
+  #meters {
+    position: fixed;
+    bottom: 20px; left: 22px;
+    z-index: 10;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    pointer-events: none;
+  }
+
+  .meter-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 9px;
+    letter-spacing: 0.15em;
+    opacity: 0.7;
+  }
+
+  .meter-label { width: 52px; color: var(--c1); }
+
+  .meter-bar {
+    width: 110px; height: 4px;
+    background: rgba(255,255,255,0.06);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+
+  .meter-fill {
+    height: 100%;
+    border-radius: 2px;
+    transition: width 0.05s linear;
+  }
+
+  .meter-val { width: 36px; text-align: right; color: var(--c1); }
+
+  #controls {
+    position: fixed;
+    top: 18px; right: 22px;
+    z-index: 10;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    align-items: flex-end;
+  }
+
+  button {
+    font-family: var(--font);
+    font-size: 9px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    padding: 6px 14px;
+    border: 1px solid rgba(0,255,224,0.35);
+    background: rgba(0,255,224,0.05);
+    color: var(--c1);
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  button:hover {
+    background: rgba(0,255,224,0.12);
+    border-color: var(--c1);
+    box-shadow: 0 0 10px rgba(0,255,224,0.3);
+  }
+
+  button.active {
+    background: rgba(0,255,224,0.15);
+    border-color: var(--c1);
+    color: #fff;
+    box-shadow: 0 0 12px rgba(0,255,224,0.4);
+  }
+
+  #status {
+    font-size: 8px;
+    letter-spacing: 0.18em;
+    opacity: 0.5;
+    color: var(--c2);
+    text-align: right;
+  }
+
+  /* Scanline overlay */
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: repeating-linear-gradient(
+      to bottom,
+      transparent 0px,
+      transparent 3px,
+      rgba(0,0,0,0.07) 3px,
+      rgba(0,0,0,0.07) 4px
+    );
+    pointer-events: none;
+    z-index: 5;
+  }
+</style>
+</head>
+<body>
+
+<canvas id="c"></canvas>
+
+<div id="hud">
+  <div class="title">(0,1) // audioreactive</div>
+  <div class="big">HARMONIC WEB</div>
+</div>
+
+<div id="meters">
+  <div class="meter-row">
+    <span class="meter-label">AMP</span>
+    <div class="meter-bar"><div class="meter-fill" id="m-amp" style="background:var(--c1); width:0%"></div></div>
+    <span class="meter-val" id="v-amp">0.00</span>
+  </div>
+  <div class="meter-row">
+    <span class="meter-label">LOW</span>
+    <div class="meter-bar"><div class="meter-fill" id="m-low" style="background:var(--c2); width:0%"></div></div>
+    <span class="meter-val" id="v-low">0.00</span>
+  </div>
+  <div class="meter-row">
+    <span class="meter-label">MID</span>
+    <div class="meter-bar"><div class="meter-fill" id="m-mid" style="background:var(--c3); width:0%"></div></div>
+    <span class="meter-val" id="v-mid">0.00</span>
+  </div>
+  <div class="meter-row">
+    <span class="meter-label">HIGH</span>
+    <div class="meter-bar"><div class="meter-fill" id="m-high" style="background:var(--c4); width:0%"></div></div>
+    <span class="meter-val" id="v-high">0.00</span>
+  </div>
+</div>
+
+<div id="controls">
+  <button id="btn-mic">[ MIC OFF ]</button>
+  <button id="btn-demo" class="active">[ DEMO ON ]</button>
+  <button id="btn-mode">[ MESH ]</button>
+  <div id="status">awaiting input</div>
+</div>
+
+<script>
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+
+// ── Grid config ──────────────────────────────────────────────
+const COLS = 28;
+const ROWS = 18;
+let W, H, cellW, cellH;
+let pts = []; // { ox, oy, x, y, vx, vy }
+
+function resize() {
+  W = canvas.width  = window.innerWidth;
+  H = canvas.height = window.innerHeight;
+  cellW = W / (COLS - 1);
+  cellH = H / (ROWS - 1);
+  buildGrid();
+}
+
+function buildGrid() {
+  pts = [];
+  for (let r = 0; r < ROWS; r++)
+    for (let c = 0; c < COLS; c++)
+      pts.push({ ox: c * cellW, oy: r * cellH, x: c * cellW, y: r * cellH, vx: 0, vy: 0 });
+}
+
+// ── Audio ─────────────────────────────────────────────────────
+let audioCtx = null, analyser = null, dataArr = null;
+let micActive = false;
+let amp = 0, low = 0, mid = 0, high = 0;
+let demoMode = true;
+
+async function startMic() {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    analyser = audioCtx.createAnalyser();
+    analyser.fftSize = 2048;
+    analyser.smoothingTimeConstant = 0.8;
+    dataArr = new Uint8Array(analyser.frequencyBinCount);
+    const src = audioCtx.createMediaStreamSource(stream);
+    src.connect(analyser);
+    micActive = true;
+    demoMode = false;
+    document.getElementById('btn-mic').textContent = '[ MIC ON ]';
+    document.getElementById('btn-mic').classList.add('active');
+    document.getElementById('btn-demo').textContent = '[ DEMO OFF ]';
+    document.getElementById('btn-demo').classList.remove('active');
+    document.getElementById('status').textContent = 'mic active';
+  } catch(e) {
+    document.getElementById('status').textContent = 'mic denied';
+  }
+}
+
+function stopMic() {
+  micActive = false;
+  if (audioCtx) { audioCtx.close(); audioCtx = null; analyser = null; }
+  document.getElementById('btn-mic').textContent = '[ MIC OFF ]';
+  document.getElementById('btn-mic').classList.remove('active');
+}
+
+function readAudio(t) {
+  if (micActive && analyser) {
+    analyser.getByteFrequencyData(dataArr);
+    const N = dataArr.length;
+    // amp = RMS-ish over all bins
+    let sum = 0;
+    for (let i = 0; i < N; i++) sum += dataArr[i];
+    amp = (sum / N) / 255;
+
+    const lowEnd  = Math.floor(N * 0.04);
+    const midEnd  = Math.floor(N * 0.25);
+    const highEnd = Math.floor(N * 0.7);
+
+    low  = avg(dataArr, 0,      lowEnd)  / 255;
+    mid  = avg(dataArr, lowEnd, midEnd)  / 255;
+    high = avg(dataArr, midEnd, highEnd) / 255;
+  } else if (demoMode) {
+    // Smooth LFO demo signal
+    amp  = 0.3 + 0.28 * Math.sin(t * 0.9);
+    low  = 0.4 + 0.35 * Math.sin(t * 0.5);
+    mid  = 0.3 + 0.30 * Math.sin(t * 1.3 + 1);
+    high = 0.2 + 0.20 * Math.sin(t * 2.1 + 2);
+  } else {
+    amp = low = mid = high = 0;
+  }
+  // Clamp
+  amp  = Math.min(1, amp);
+  low  = Math.min(1, low);
+  mid  = Math.min(1, mid);
+  high = Math.min(1, high);
+}
+
+function avg(arr, a, b) {
+  let s = 0;
+  for (let i = a; i < b; i++) s += arr[i];
+  return s / (b - a);
+}
+
+// ── Draw modes ────────────────────────────────────────────────
+const MODES = ['MESH', 'RADIAL', 'FLOW'];
+let modeIdx = 0;
+document.getElementById('btn-mode').addEventListener('click', () => {
+  modeIdx = (modeIdx + 1) % MODES.length;
+  document.getElementById('btn-mode').textContent = `[ ${MODES[modeIdx]} ]`;
+});
+
+// ── Colour helpers ────────────────────────────────────────────
+function spectralColor(phase, brightness) {
+  // Maps 0–1 to a vivid hue spectrum
+  const hue = (phase * 360) % 360;
+  const sat = 80 + high * 20;
+  const lgt = 40 + brightness * 35;
+  return `hsl(${hue},${sat}%,${lgt}%)`;
+}
+
+function lineColor(phase, alpha) {
+  const hue = (phase * 360) % 360;
+  return `hsla(${hue},90%,60%,${alpha})`;
+}
+
+// ── Simulation ────────────────────────────────────────────────
+function updateGrid(t) {
+  for (let r = 0; r < ROWS; r++) {
+    for (let c = 0; c < COLS; c++) {
+      const p = pts[r * COLS + c];
+      const nc = c / (COLS - 1); // 0–1 normalised
+      const nr = r / (ROWS - 1);
+
+      // Multi-wave deformation — each band drives a different spatial frequency
+      const wLow  = Math.sin(nc * Math.PI * 2 + t * 0.6) * Math.cos(nr * Math.PI + t * 0.4);
+      const wMid  = Math.sin(nc * Math.PI * 4 + t * 1.1 + nr * 2) * 0.6;
+      const wHigh = Math.sin(nc * Math.PI * 8 + t * 2.5 + nr * 5) * 0.3;
+
+      // Harmonic self-recurrence: phase accumulates non-linearly
+      const phase = (nc + nr + t * 0.2) % 1;
+      const recurse = Math.sin(phase * Math.PI * 6 + amp * 4);
+
+      const dx = (wLow * low + wMid * mid + wHigh * high) * cellW * 0.55
+               + recurse * amp * cellW * 0.35;
+      const dy = (Math.cos(nr * Math.PI * 3 + t * 0.7) * low
+               +  Math.sin(nc * Math.PI * 5 + t * 1.4) * mid * 0.5
+               +  recurse * high * 0.3) * cellH * 0.55;
+
+      p.x = p.ox + dx;
+      p.y = p.oy + dy;
+    }
+  }
+}
+
+// ── Render ────────────────────────────────────────────────────
+function drawMesh(t) {
+  const lineW = 0.6 + amp * 1.4;
+
+  for (let r = 0; r < ROWS; r++) {
+    for (let c = 0; c < COLS; c++) {
+      const p = pts[r * COLS + c];
+      const phase = ((c / COLS) + (r / ROWS) * 0.618 + t * 0.07) % 1;
+      const alpha = 0.25 + amp * 0.55;
+
+      ctx.lineWidth = lineW;
+      ctx.strokeStyle = lineColor(phase, alpha);
+
+      // Horizontal
+      if (c < COLS - 1) {
+        const p2 = pts[r * COLS + c + 1];
+        ctx.beginPath();
+        ctx.moveTo(p.x, p.y);
+        ctx.lineTo(p2.x, p2.y);
+        ctx.stroke();
+      }
+      // Vertical
+      if (r < ROWS - 1) {
+        const p2 = pts[(r + 1) * COLS + c];
+        ctx.beginPath();
+        ctx.moveTo(p.x, p.y);
+        ctx.lineTo(p2.x, p2.y);
+        ctx.stroke();
+      }
+      // Diagonal (adds depth)
+      if (c < COLS - 1 && r < ROWS - 1 && amp > 0.15) {
+        const p2 = pts[(r + 1) * COLS + c + 1];
+        ctx.lineWidth = lineW * 0.4;
+        ctx.strokeStyle = lineColor((phase + 0.3) % 1, alpha * 0.4);
+        ctx.beginPath();
+        ctx.moveTo(p.x, p.y);
+        ctx.lineTo(p2.x, p2.y);
+        ctx.stroke();
+      }
+    }
+  }
+
+  // Nodes glow on high energy
+  if (amp > 0.2) {
+    for (let i = 0; i < pts.length; i++) {
+      const p = pts[i];
+      const c2 = Math.floor(i % COLS);
+      const r2 = Math.floor(i / COLS);
+      const phase = ((c2 / COLS) + (r2 / ROWS) * 0.618 + t * 0.07) % 1;
+      const r = 1.2 + amp * 2.8;
+      const grd = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, r * 3);
+      const hue = (phase * 360) % 360;
+      grd.addColorStop(0, `hsla(${hue},100%,80%,${amp * 0.9})`);
+      grd.addColorStop(1, `hsla(${hue},100%,60%,0)`);
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, r * 3, 0, Math.PI * 2);
+      ctx.fillStyle = grd;
+      ctx.fill();
+    }
+  }
+}
+
+function drawRadial(t) {
+  const cx = W / 2, cy = H / 2;
+  const rings = 9;
+  const spokes = 24;
+
+  for (let ring = 1; ring <= rings; ring++) {
+    const baseR = (ring / rings) * Math.min(W, H) * 0.48;
+    const pts2 = [];
+
+    for (let s = 0; s <= spokes; s++) {
+      const angle = (s / spokes) * Math.PI * 2;
+      const nc = s / spokes;
+      const nr = ring / rings;
+
+      const distort = baseR * (
+          low  * 0.25 * Math.sin(angle * 2 + t * 0.8)
+        + mid  * 0.18 * Math.sin(angle * 4 + t * 1.5)
+        + high * 0.12 * Math.sin(angle * 7 + t * 2.8)
+        + amp  * 0.20 * Math.sin((angle + nr) * 6 + t * 1.2)
+      );
+
+      const rr = baseR + distort;
+      pts2.push({ x: cx + Math.cos(angle) * rr, y: cy + Math.sin(angle) * rr });
+    }
+
+    const phase = (ring / rings + t * 0.06) % 1;
+    ctx.strokeStyle = lineColor(phase, 0.35 + amp * 0.5);
+    ctx.lineWidth = 0.7 + amp;
+    ctx.beginPath();
+    ctx.moveTo(pts2[0].x, pts2[0].y);
+    for (let i = 1; i < pts2.length; i++) ctx.lineTo(pts2[i].x, pts2[i].y);
+    ctx.closePath();
+    ctx.stroke();
+  }
+
+  // Spokes
+  for (let s = 0; s < spokes; s++) {
+    const angle = (s / spokes) * Math.PI * 2;
+    const phase = (s / spokes + t * 0.04) % 1;
+    ctx.strokeStyle = lineColor(phase, 0.15 + amp * 0.25);
+    ctx.lineWidth = 0.5;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.lineTo(
+      cx + Math.cos(angle) * Math.min(W,H) * 0.48,
+      cy + Math.sin(angle) * Math.min(W,H) * 0.48
+    );
+    ctx.stroke();
+  }
+}
+
+function drawFlow(t) {
+  const particles = 800;
+  for (let i = 0; i < particles; i++) {
+    const ni = i / particles;
+    // Each particle follows a noise-like Lissajous path
+    const px = (0.5 + 0.45 * Math.sin(ni * Math.PI * 7  + t * (0.4 + low)))  * W;
+    const py = (0.5 + 0.45 * Math.sin(ni * Math.PI * 11 + t * (0.5 + mid) + 0.8)) * H;
+
+    const size = 1.5 + amp * 3.5 + high * 2;
+    const phase = (ni + t * 0.05) % 1;
+    const hue = (phase * 360) % 360;
+    const alpha = 0.4 + amp * 0.5;
+
+    ctx.beginPath();
+    ctx.arc(px, py, size, 0, Math.PI * 2);
+    ctx.fillStyle = `hsla(${hue},90%,65%,${alpha})`;
+    ctx.fill();
+  }
+}
+
+// ── Main loop ─────────────────────────────────────────────────
+let startTime = null;
+function loop(ts) {
+  if (!startTime) startTime = ts;
+  const t = (ts - startTime) / 1000;
+
+  readAudio(t);
+
+  // Trail fade
+  ctx.fillStyle = `rgba(3,4,9,${0.18 + amp * 0.12})`;
+  ctx.fillRect(0, 0, W, H);
+
+  updateGrid(t);
+
+  const mode = MODES[modeIdx];
+  if (mode === 'MESH')   drawMesh(t);
+  if (mode === 'RADIAL') drawRadial(t);
+  if (mode === 'FLOW')   drawFlow(t);
+
+  // Update HUD meters
+  document.getElementById('m-amp').style.width  = (amp  * 100) + '%';
+  document.getElementById('m-low').style.width  = (low  * 100) + '%';
+  document.getElementById('m-mid').style.width  = (mid  * 100) + '%';
+  document.getElementById('m-high').style.width = (high * 100) + '%';
+  document.getElementById('v-amp').textContent  = amp .toFixed(2);
+  document.getElementById('v-low').textContent  = low .toFixed(2);
+  document.getElementById('v-mid').textContent  = mid .toFixed(2);
+  document.getElementById('v-high').textContent = high.toFixed(2);
+
+  requestAnimationFrame(loop);
+}
+
+// ── Controls ──────────────────────────────────────────────────
+document.getElementById('btn-mic').addEventListener('click', () => {
+  if (micActive) {
+    stopMic();
+    document.getElementById('status').textContent = 'mic stopped';
+  } else {
+    startMic();
+  }
+});
+
+document.getElementById('btn-demo').addEventListener('click', () => {
+  demoMode = !demoMode;
+  document.getElementById('btn-demo').textContent = demoMode ? '[ DEMO ON ]' : '[ DEMO OFF ]';
+  document.getElementById('btn-demo').classList.toggle('active', demoMode);
+  document.getElementById('status').textContent = demoMode ? 'demo mode' : 'silence';
+  if (demoMode && micActive) stopMic();
+});
+
+// ── Boot ──────────────────────────────────────────────────────
+window.addEventListener('resize', resize);
+resize();
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
