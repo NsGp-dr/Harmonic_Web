@@ -1,0 +1,1128 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MEMBRANE FIBER — Resonant Data Laboratory</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;600&family=Space+Mono:wght@400;700&display=swap');
+
+  :root {
+    --bg:      #04080c;
+    --panel:   #060c10;
+    --border:  #0f1e2a;
+    --c1:      #00e5ff;  /* cyan — freq */
+    --c2:      #76ff03;  /* lime — onset */
+    --c3:      #ff6d00;  /* amber — stochastic */
+    --c4:      #e040fb;  /* purple — copula */
+    --c5:      #ffd600;  /* gold — eigenvalue */
+    --dim:     #1a3040;
+    --text:    #8ab0c4;
+    --bright:  #d0ecff;
+  }
+
+  * { margin:0; padding:0; box-sizing:border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    overflow: hidden;
+    height: 100vh;
+    display: grid;
+    grid-template-rows: 38px 1fr 28px;
+    grid-template-columns: 1fr 280px;
+  }
+
+  /* ── HEADER ── */
+  header {
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 14px;
+    border-bottom: 1px solid var(--border);
+    background: #020608;
+    gap: 14px;
+  }
+  .logo {
+    font-family: 'Space Mono', monospace;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 5px;
+    color: var(--c1);
+    text-shadow: 0 0 16px #00e5ff66;
+    flex-shrink: 0;
+  }
+  .logo em { color: var(--c4); font-style: normal; }
+  .header-metrics {
+    display: flex;
+    gap: 16px;
+    align-items: center;
+    flex: 1;
+    justify-content: center;
+  }
+  .hm { font-size: 9px; letter-spacing: 1px; color: var(--dim); }
+  .hm span { color: var(--c1); font-size: 11px; }
+  .header-btns { display: flex; gap: 8px; align-items: center; }
+  .btn-pill {
+    background: none;
+    border: 1px solid var(--dim);
+    color: var(--dim);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 2px;
+    padding: 4px 10px;
+    cursor: pointer;
+    border-radius: 2px;
+    transition: all 0.2s;
+  }
+  .btn-pill:hover { border-color: var(--c1); color: var(--c1); box-shadow: 0 0 8px #00e5ff33; }
+  .btn-pill.active { border-color: var(--c2); color: var(--c2); box-shadow: 0 0 10px #76ff0344; }
+  .btn-pill.mode-active { border-color: var(--c4); color: var(--c4); }
+
+  /* ── MAIN CANVAS AREA ── */
+  .canvas-area {
+    grid-column: 1;
+    grid-row: 2;
+    position: relative;
+    overflow: hidden;
+    background: #020608;
+  }
+  #canvas-membrane {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+  }
+
+  /* overlay HUD on membrane */
+  .membrane-hud {
+    position: absolute;
+    top: 8px; left: 10px;
+    font-size: 9px;
+    letter-spacing: 2px;
+    color: rgba(0,229,255,0.35);
+    pointer-events: none;
+    line-height: 1.8;
+  }
+  .membrane-hud .mh-label { color: rgba(224,64,251,0.5); }
+
+  /* mode selector overlay */
+  .mode-bar {
+    position: absolute;
+    bottom: 8px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 4px;
+  }
+
+  /* ── RIGHT SIDEBAR ── */
+  .sidebar {
+    grid-column: 2;
+    grid-row: 2;
+    display: flex;
+    flex-direction: column;
+    border-left: 1px solid var(--border);
+    background: var(--panel);
+    overflow: hidden;
+    gap: 1px;
+  }
+
+  .sb-section {
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .sb-title {
+    font-size: 8px;
+    letter-spacing: 3px;
+    color: var(--dim);
+  }
+  .sb-title em { color: var(--c4); font-style: normal; }
+
+  /* Pitch display */
+  .pitch-big {
+    font-family: 'Space Mono', monospace;
+    font-size: 32px;
+    font-weight: 700;
+    color: var(--c1);
+    text-shadow: 0 0 18px #00e5ff88;
+    line-height: 1;
+  }
+  .pitch-hz { font-size: 11px; color: var(--c2); margin-top: 2px; }
+  .pitch-cents { font-size: 9px; color: var(--c3); }
+
+  /* gauge */
+  .gauge { height: 3px; background: var(--border); border-radius: 2px; overflow: hidden; margin-top: 3px; }
+  .gauge-fill { height: 100%; border-radius: 2px; transition: width 0.1s; }
+
+  /* metric rows */
+  .mrow { display: flex; justify-content: space-between; align-items: center; gap: 6px; }
+  .ml { color: var(--dim); font-size: 9px; letter-spacing: 1px; flex-shrink:0; width: 60px; }
+  .mv { color: var(--bright); font-size: 10px; font-weight: 600; width: 42px; text-align:right; }
+  .mbar { flex:1; height: 2px; background: var(--border); border-radius:1px; overflow:hidden; }
+  .mbar-fill { height:100%; border-radius:1px; transition: width 0.08s; }
+
+  /* Eigenvalue display */
+  #canvas-eigen {
+    width: 100%;
+    height: 80px;
+    display: block;
+    border-radius: 2px;
+  }
+
+  /* Copula canvas */
+  #canvas-copula {
+    width: 100%;
+    height: 60px;
+    display: block;
+  }
+
+  /* Harmony ring: lissajous mini */
+  #canvas-liss {
+    width: 100%;
+    height: 100px;
+    display: block;
+  }
+
+  /* Note log */
+  .note-log {
+    font-size: 8px;
+    color: var(--dim);
+    flex: 1;
+    overflow-y: auto;
+    scrollbar-width: none;
+    line-height: 1.7;
+  }
+  .note-log::-webkit-scrollbar { display: none; }
+  .log-e .ln { color: var(--c1); }
+  .log-e .lc { color: var(--c4); }
+  .log-e .lt { color: #0e1c28; }
+
+  /* ── FOOTER ── */
+  footer {
+    grid-column: 1 / -1;
+    display: flex;
+    gap: 18px;
+    padding: 0 14px;
+    border-top: 1px solid var(--border);
+    background: #020608;
+    align-items: center;
+    font-size: 8px;
+    color: var(--dim);
+    letter-spacing: 1px;
+  }
+  footer span { color: var(--c1); }
+  footer .sep { color: #0e1c28; }
+
+  /* Flex grow last section */
+  .sb-grow { flex: 1; min-height: 0; overflow: hidden; }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header>
+  <div class="logo">MEM<em>B</em>RANE</div>
+  <div class="header-metrics">
+    <div class="hm">NOTE <span id="hd-note">—</span></div>
+    <div class="hm">FREQ <span id="hd-freq">—</span></div>
+    <div class="hm">CONF <span id="hd-conf">0.00</span></div>
+    <div class="hm">HARMONY <span id="hd-harm">—</span></div>
+    <div class="hm">EIGEN·Σ <span id="hd-eigen">—</span></div>
+  </div>
+  <div class="header-btns">
+    <button class="btn-pill" id="btn-mode-water" onclick="setMembraneMode('water')">AGUA</button>
+    <button class="btn-pill mode-active" id="btn-mode-chladni" onclick="setMembraneMode('chladni')">CHLADNI</button>
+    <button class="btn-pill" id="btn-mode-topo" onclick="setMembraneMode('topo')">TOPO</button>
+    <button class="btn-pill active" id="btn-mic">▶ MIC</button>
+  </div>
+</header>
+
+<!-- MEMBRANE CANVAS -->
+<div class="canvas-area">
+  <canvas id="canvas-membrane"></canvas>
+  <div class="membrane-hud">
+    <div>MEMBRANE FIBER <span class="mh-label">· RESONANT LABORATORY</span></div>
+    <div id="mhud-freq">f = — Hz</div>
+    <div id="mhud-mode">MODE: CHLADNI</div>
+    <div id="mhud-eigen">λ₁= —  λ₂= —  λ₃= —</div>
+  </div>
+  <div class="mode-bar">
+    <button class="btn-pill" onclick="setMembraneMode('water')">~ AGUA</button>
+    <button class="btn-pill" onclick="setMembraneMode('chladni')">⊙ CHLADNI</button>
+    <button class="btn-pill" onclick="setMembraneMode('topo')">△ TOPO</button>
+    <button class="btn-pill" onclick="setMembraneMode('lissajous')">∞ LISS</button>
+  </div>
+</div>
+
+<!-- SIDEBAR -->
+<div class="sidebar">
+
+  <!-- PITCH -->
+  <div class="sb-section" style="flex:0 0 auto;">
+    <div class="sb-title">PITCH <em>· ACF</em></div>
+    <div class="pitch-big" id="sb-note">—</div>
+    <div class="pitch-hz" id="sb-freq">— Hz</div>
+    <div class="pitch-cents" id="sb-cents">± — ¢</div>
+    <div class="gauge"><div class="gauge-fill" id="conf-bar" style="width:0%;background:var(--c4);box-shadow:0 0 6px var(--c4)"></div></div>
+  </div>
+
+  <!-- SPECTRAL METRICS -->
+  <div class="sb-section" style="flex:0 0 auto;">
+    <div class="sb-title">SPECTRAL METRICS</div>
+    <div class="mrow"><div class="ml">CENTROID</div><div class="mbar"><div class="mbar-fill" id="mb-cent" style="background:var(--c1)"></div></div><div class="mv" id="mv-cent">—</div></div>
+    <div class="mrow"><div class="ml">FLUX</div><div class="mbar"><div class="mbar-fill" id="mb-flux" style="background:var(--c2)"></div></div><div class="mv" id="mv-flux">—</div></div>
+    <div class="mrow"><div class="ml">ENTROPY</div><div class="mbar"><div class="mbar-fill" id="mb-ent" style="background:var(--c3)"></div></div><div class="mv" id="mv-ent">—</div></div>
+    <div class="mrow"><div class="ml">FLATNESS</div><div class="mbar"><div class="mbar-fill" id="mb-flat" style="background:var(--c4)"></div></div><div class="mv" id="mv-flat">—</div></div>
+  </div>
+
+  <!-- EIGENVALUES -->
+  <div class="sb-section" style="flex:0 0 auto;">
+    <div class="sb-title">AUTOVALORES <em>· PERSISTENCIA</em></div>
+    <canvas id="canvas-eigen"></canvas>
+  </div>
+
+  <!-- LISSAJOUS MINI -->
+  <div class="sb-section" style="flex:0 0 auto;">
+    <div class="sb-title">HARMONIC LISSAJOUS</div>
+    <canvas id="canvas-liss"></canvas>
+  </div>
+
+  <!-- COPULA -->
+  <div class="sb-section" style="flex:0 0 auto;">
+    <div class="sb-title">COPULAR <em>· Σ(f,c,H)</em></div>
+    <canvas id="canvas-copula"></canvas>
+  </div>
+
+  <!-- LOG -->
+  <div class="sb-section sb-grow">
+    <div class="sb-title">EVENT LOG</div>
+    <div class="note-log" id="note-log"></div>
+  </div>
+
+</div>
+
+<!-- FOOTER -->
+<footer>
+  <div>SR <span id="ft-sr">—</span></div>
+  <div class="sep">|</div>
+  <div>FFT <span id="ft-fft">4096</span></div>
+  <div class="sep">|</div>
+  <div>RMS <span id="ft-rms">—</span></div>
+  <div class="sep">|</div>
+  <div>FRAME <span id="ft-frame">0</span></div>
+  <div class="sep">|</div>
+  <div>MODE <span id="ft-mode">CHLADNI</span></div>
+  <div class="sep">|</div>
+  <div>HARMONY <span id="ft-harm">—</span></div>
+</footer>
+
+<script>
+// ════════════════════════════════════════════════════
+//  MEMBRANE FIBER — Resonant Data Laboratory
+//  Nicolás · 2026
+//  Integra: STROMA análisis + Harmonic Geometry + Membrana Chladni/Agua
+//  Autovalores espectrales · Topología persistente · Cópulas
+// ════════════════════════════════════════════════════
+
+const NOTE_NAMES = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+const FFT_SIZE   = 4096;
+
+// Audio state
+let audioCtx, analyser, micStream;
+let running = false;
+let frameCount = 0;
+let prevMag = null;
+
+// Canvases
+const cMem    = document.getElementById('canvas-membrane');
+const cEigen  = document.getElementById('canvas-eigen');
+const cLiss   = document.getElementById('canvas-liss');
+const cCopula = document.getElementById('canvas-copula');
+
+const ctxMem    = cMem.getContext('2d');
+const ctxEigen  = cEigen.getContext('2d');
+const ctxLiss   = cLiss.getContext('2d');
+const ctxCopula = cCopula.getContext('2d');
+
+// History buffers
+const HIST = 300;
+const pitchH   = new Float32Array(HIST);
+const confH    = new Float32Array(HIST);
+const centH    = new Float32Array(HIST);
+const fluxH    = new Float32Array(HIST);
+const entrH    = new Float32Array(HIST);
+const copH     = new Float32Array(HIST);
+const onsetH   = new Uint8Array(HIST);
+// Eigenvalue history (3 principal)
+const eigen1H  = new Float32Array(HIST);
+const eigen2H  = new Float32Array(HIST);
+const eigen3H  = new Float32Array(HIST);
+
+// Membrane state
+let memMode = 'chladni';
+let memPhase = 0;
+let waterGrid = null;
+let waterGridPrev = null;
+let waterGridVel = null;
+const WATER_W = 120, WATER_H = 80;
+
+// Lissajous state
+let lissPhase = 0;
+
+// Current values
+let curFreq = 0, curConf = 0, curNote = -1, curCents = 0;
+let curRMS = 0, curCentroid = 0, curFlux = 0, curEntropy = 0, curFlat = 0;
+let curCopula = 0;
+let curEigen = [0,0,0];
+let curHarmony = '—';
+
+// ── RESIZE ──
+function resize() {
+  const area = document.querySelector('.canvas-area');
+  cMem.width  = area.clientWidth;
+  cMem.height = area.clientHeight;
+  // sidebar canvases
+  [cEigen, cLiss, cCopula].forEach(c => {
+    c.width  = c.clientWidth  || c.parentElement.clientWidth - 20;
+    c.height = c.clientHeight || parseInt(c.style.height || '80');
+  });
+  // reinit water grid
+  initWater();
+}
+
+// ── WATER GRID ──
+function initWater() {
+  waterGrid     = new Float32Array(WATER_W * WATER_H);
+  waterGridPrev = new Float32Array(WATER_W * WATER_H);
+  waterGridVel  = new Float32Array(WATER_W * WATER_H);
+}
+
+function wIdx(x,y) { return y * WATER_W + x; }
+
+function updateWater(freq, rms) {
+  if (!waterGrid) return;
+  const c = 0.18;  // wave speed
+  const damp = 0.985;
+
+  // Excite center with audio signal
+  if (rms > 0.005) {
+    const cx = Math.floor(WATER_W / 2);
+    const cy = Math.floor(WATER_H / 2);
+    const amp = Math.min(rms * 40, 3.0);
+    // Also excite harmonic points based on frequency
+    const harmR = Math.min(WATER_W, WATER_H) * 0.3;
+    const numH = 3;
+    for (let h = 0; h < numH; h++) {
+      const a = (h / numH) * Math.PI * 2 + memPhase;
+      const hx = Math.floor(cx + Math.cos(a) * harmR * (0.3 + h * 0.2));
+      const hy = Math.floor(cy + Math.sin(a) * harmR * (0.3 + h * 0.2));
+      if (hx > 0 && hx < WATER_W-1 && hy > 0 && hy < WATER_H-1) {
+        waterGrid[wIdx(hx,hy)] += amp * 0.5 * Math.sin(memPhase * (h+1));
+      }
+    }
+    waterGrid[wIdx(cx,cy)] += amp;
+  }
+
+  // Wave equation
+  const next = new Float32Array(WATER_W * WATER_H);
+  for (let y = 1; y < WATER_H-1; y++) {
+    for (let x = 1; x < WATER_W-1; x++) {
+      const i = wIdx(x,y);
+      const lap = waterGrid[wIdx(x+1,y)] + waterGrid[wIdx(x-1,y)]
+                + waterGrid[wIdx(x,y+1)] + waterGrid[wIdx(x,y-1)]
+                - 4 * waterGrid[i];
+      next[i] = (2*waterGrid[i] - waterGridPrev[i] + c*c*lap) * damp;
+    }
+  }
+  waterGridPrev = waterGrid.slice();
+  waterGrid = next;
+}
+
+// ── CHLADNI PATTERN (nodal lines) ──
+function chladniValue(x, y, W, H, freq) {
+  const nx = (x / W - 0.5) * 2 * Math.PI;
+  const ny = (y / H - 0.5) * 2 * Math.PI;
+  // Use frequency to determine mode numbers
+  const m = Math.max(1, Math.round(freq / 220));
+  const n = Math.max(1, Math.round(freq / 330));
+  return Math.sin(m * nx) * Math.cos(n * ny) - Math.cos(m * nx) * Math.sin(n * ny);
+}
+
+// ── TOPOLOGICAL PERSISTENCE (simplified) ──
+// Compute a pseudo-persistence landscape from spectral data
+function computeEigenvalues(freqData) {
+  // PCA-like: compute spectral covariance eigenvalues
+  // Use sub-bands as "features"
+  const bands = 8;
+  const bandSize = Math.floor(freqData.length / bands);
+  const bandEnergies = new Float32Array(bands);
+  for (let b = 0; b < bands; b++) {
+    let e = 0;
+    for (let k = 0; k < bandSize; k++) {
+      const v = freqData[b * bandSize + k] / 255;
+      e += v * v;
+    }
+    bandEnergies[b] = e / bandSize;
+  }
+  // "Eigenvalues" from sorted band energies (dominant components)
+  const sorted = [...bandEnergies].sort((a,b) => b - a);
+  const total = sorted.reduce((s,v) => s + v, 1e-9);
+  return [sorted[0]/total, sorted[1]/total, (sorted[2]||0)/total];
+}
+
+// ── PITCH DETECTION (ACF) ──
+function detectPitch(timeDomain, sampleRate) {
+  const N = timeDomain.length;
+  const minP = Math.floor(sampleRate / 1200);
+  const maxP = Math.floor(sampleRate / 50);
+  let rms = 0;
+  for (let i = 0; i < N; i++) rms += timeDomain[i]*timeDomain[i];
+  rms = Math.sqrt(rms/N);
+  if (rms < 0.008) return { freq:0, confidence:0, rms };
+
+  let bestLag=-1, bestVal=-Infinity;
+  for (let lag=minP; lag<maxP; lag++) {
+    let s=0;
+    for (let i=0; i<N-lag; i++) s += timeDomain[i]*timeDomain[i+lag];
+    if (s > bestVal) { bestVal=s; bestLag=lag; }
+  }
+  if (bestLag<0) return {freq:0,confidence:0,rms};
+
+  const y0 = acf(timeDomain,N,Math.max(0,bestLag-1));
+  const y1 = bestVal;
+  const y2 = acf(timeDomain,N,bestLag+1);
+  const d = 2*(2*y1-y0-y2);
+  const rl = d!==0 ? bestLag+(y0-y2)/d : bestLag;
+  const freq = sampleRate/rl;
+  const r0 = acf(timeDomain,N,0);
+  const confidence = r0>0 ? Math.min(1,Math.max(0,bestVal/r0)) : 0;
+  return {freq,confidence,rms};
+}
+function acf(buf,N,lag) {
+  let s=0; for(let i=0;i<N-lag;i++) s+=buf[i]*buf[i+lag]; return s;
+}
+
+// ── SPECTRAL FEATURES ──
+function spectralCentroid(mag, sr, fftSize) {
+  let num=0,den=0;
+  for(let k=0;k<mag.length;k++){const f=k*sr/fftSize,m=mag[k]*mag[k];num+=f*m;den+=m;}
+  return den>0?num/den:0;
+}
+function spectralFlatness(mag) {
+  const N=mag.length; let ls=0,lin=0;
+  for(let k=0;k<N;k++){const m=Math.max(mag[k],1e-10);ls+=Math.log(m);lin+=m;}
+  return Math.exp(ls/N)/(lin/N+1e-10);
+}
+function spectralFlux(mag,prev) {
+  if(!prev) return 0;
+  let f=0; for(let k=0;k<mag.length;k++){const d=mag[k]-prev[k];if(d>0)f+=d;} return f;
+}
+function shannonEntropy(mag) {
+  let s=0; for(let k=0;k<mag.length;k++) s+=mag[k];
+  if(s<1e-10) return 0;
+  let e=0; for(let k=0;k<mag.length;k++){const p=mag[k]/s;if(p>0)e-=p*Math.log2(p);}
+  return e/Math.log2(mag.length+1);
+}
+
+function freqToNote(freq) {
+  if(freq<50) return {note:-1,cents:0,name:'—'};
+  const midi=69+12*Math.log2(freq/440);
+  const r=Math.round(midi);
+  const cents=(midi-r)*100;
+  const name=NOTE_NAMES[((r%12)+12)%12]+(Math.floor(r/12)-1);
+  return {note:((r%12)+12)%12, cents, name};
+}
+
+// Harmony detection
+const INTERVALS = {
+  0:'P1',1:'m2',2:'M2',3:'m3',4:'M3',5:'P4',
+  6:'TT',7:'P5',8:'m6',9:'M6',10:'m7',11:'M7'
+};
+function detectHarmony(noteAmps) {
+  const active = noteAmps.map((a,i)=>({a,i})).filter(x=>x.a>0.12).sort((a,b)=>b.a-a.a);
+  if(active.length < 2) return '—';
+  const iv = (active[1].i - active[0].i + 12) % 12;
+  return INTERVALS[iv] || '?';
+}
+
+// ── MEMBRANE DRAW MODES ──
+
+function drawWater(freq, rms) {
+  const W = cMem.width, H = cMem.height;
+  updateWater(freq, rms);
+
+  // Render water grid via bilinear upscale
+  const scaleX = W / WATER_W;
+  const scaleY = H / WATER_H;
+
+  // Dark background
+  ctxMem.fillStyle = '#020608';
+  ctxMem.fillRect(0,0,W,H);
+
+  // Draw water displacement as colored image
+  for (let y = 0; y < WATER_H - 1; y++) {
+    for (let x = 0; x < WATER_W - 1; x++) {
+      const v = waterGrid[wIdx(x,y)];
+      const intensity = Math.max(-1, Math.min(1, v * 0.5));
+      let r, g, b, a;
+      if (intensity > 0) {
+        // Crest: cyan → white
+        r = Math.floor(intensity * 180);
+        g = Math.floor(180 + intensity * 75);
+        b = Math.floor(200 + intensity * 55);
+        a = 0.15 + intensity * 0.7;
+      } else {
+        // Trough: dark blue
+        const ni = -intensity;
+        r = 0;
+        g = Math.floor(ni * 30);
+        b = Math.floor(40 + ni * 120);
+        a = ni * 0.5;
+      }
+      ctxMem.fillStyle = `rgba(${r},${g},${b},${a})`;
+      ctxMem.fillRect(x*scaleX, y*scaleY, scaleX+1, scaleY+1);
+    }
+  }
+
+  // Concentric rings emanating from center
+  const cx = W/2, cy = H/2;
+  const maxR = Math.min(W,H) * 0.45;
+  const numRings = 8;
+  ctxMem.save();
+  for (let r = 0; r < numRings; r++) {
+    const radius = (r / numRings) * maxR;
+    // Sample water at this ring
+    const wx = Math.floor(WATER_W/2 + Math.cos(0) * (r/numRings) * WATER_W * 0.4);
+    const wy = Math.floor(WATER_H/2);
+    const amp = waterGrid ? (waterGrid[wIdx(Math.max(0,Math.min(WATER_W-1,wx)), Math.max(0,Math.min(WATER_H-1,wy)))] || 0) : 0;
+    const distort = Math.max(0, amp * 8);
+    const alpha = 0.06 + Math.abs(amp) * 0.4;
+    ctxMem.strokeStyle = `rgba(0,229,255,${Math.min(0.6,alpha)})`;
+    ctxMem.lineWidth = 0.5 + distort * 0.5;
+    ctxMem.beginPath();
+    ctxMem.arc(cx, cy, radius + distort * 6, 0, Math.PI*2);
+    ctxMem.stroke();
+  }
+  ctxMem.restore();
+}
+
+function drawChladni(freq, rms) {
+  const W = cMem.width, H = cMem.height;
+
+  // Fade
+  ctxMem.fillStyle = 'rgba(2,6,8,0.12)';
+  ctxMem.fillRect(0,0,W,H);
+
+  // Compute Chladni pattern
+  const f = freq > 50 ? freq : 220;
+  const m = Math.max(1, Math.round(f/220));
+  const n = Math.max(1, Math.round(f/330));
+
+  // Draw nodal lines with isoline approach
+  const step = 4;
+  for (let py = 0; py < H; py += step) {
+    for (let px = 0; px < W; px += step) {
+      const nx = (px/W - 0.5) * 2;
+      const ny = (py/H - 0.5) * 2;
+      const v  = Math.sin(m * Math.PI * nx) * Math.cos(n * Math.PI * ny)
+               - Math.cos(m * Math.PI * nx) * Math.sin(n * Math.PI * ny);
+
+      const isNode = Math.abs(v) < 0.06 + (1-curConf)*0.08;
+      if (isNode) {
+        const brightness = 0.3 + rms * 8 + curConf * 0.5;
+        const hue = (f / 880 * 180 + 180) % 360; // map freq to hue
+        ctxMem.fillStyle = `hsla(${hue},80%,${50+brightness*30}%,${Math.min(0.9,brightness)})`;
+        ctxMem.fillRect(px, py, step, step);
+      }
+    }
+  }
+
+  // Concentric resonance rings
+  const cx = W/2, cy = H/2;
+  const t = memPhase;
+  for (let r = 1; r <= 5; r++) {
+    const radius = (r/6) * Math.min(W,H)*0.47;
+    const pulse = rms > 0.01 ? Math.sin(t * 2 + r) * rms * 20 : 0;
+    const alpha = 0.04 + curConf * 0.2 * (1 - r/6);
+    ctxMem.strokeStyle = `rgba(0,229,255,${alpha})`;
+    ctxMem.lineWidth = 0.5;
+    ctxMem.beginPath();
+    ctxMem.arc(cx, cy, radius + pulse, 0, Math.PI*2);
+    ctxMem.stroke();
+  }
+}
+
+function drawTopo(freq, rms) {
+  const W = cMem.width, H = cMem.height;
+  ctxMem.fillStyle = 'rgba(2,6,8,0.08)';
+  ctxMem.fillRect(0,0,W,H);
+
+  const cx = W/2, cy = H/2;
+  const f = freq > 50 ? freq : 220;
+
+  // Persistence landscape: draw "birth-death" arcs
+  const numFeatures = 12;
+  for (let i = 0; i < numFeatures; i++) {
+    const amp = curEigen[i % 3] || 0.1;
+    const angle = (i / numFeatures) * Math.PI * 2 + memPhase * 0.5;
+    const r_birth = (i / numFeatures) * Math.min(W,H)*0.45;
+    const r_death = r_birth + amp * 80;
+
+    const x0 = cx + Math.cos(angle) * r_birth;
+    const y0 = cy + Math.sin(angle) * r_birth;
+    const x1 = cx + Math.cos(angle) * r_death;
+    const y1 = cy + Math.sin(angle) * r_death;
+
+    const alpha = 0.1 + amp * 0.6;
+    const hue = (i/numFeatures*360 + f/880*120) % 360;
+    ctxMem.strokeStyle = `hsla(${hue},70%,60%,${alpha})`;
+    ctxMem.lineWidth = 1 + amp * 2;
+    ctxMem.beginPath();
+    ctxMem.moveTo(x0,y0);
+    ctxMem.lineTo(x1,y1);
+    ctxMem.stroke();
+
+    // Birth dot
+    ctxMem.fillStyle = `hsla(${hue},90%,70%,${alpha*0.8})`;
+    ctxMem.beginPath();
+    ctxMem.arc(x1,y1, 2+amp*4,0,Math.PI*2);
+    ctxMem.fill();
+  }
+
+  // Central eigenvalue display
+  const e1=curEigen[0], e2=curEigen[1], e3=curEigen[2];
+  [e1,e2,e3].forEach((e,i) => {
+    const r = e * Math.min(W,H)*0.45;
+    const alpha = 0.15 + e * 0.5;
+    ctxMem.strokeStyle = i===0?`rgba(0,229,255,${alpha})`:
+                         i===1?`rgba(118,255,3,${alpha})`:`rgba(224,64,251,${alpha})`;
+    ctxMem.lineWidth = 1.5;
+    ctxMem.setLineDash(i===2?[4,4]:[]);
+    ctxMem.beginPath();
+    ctxMem.arc(cx,cy,r,0,Math.PI*2);
+    ctxMem.stroke();
+    ctxMem.setLineDash([]);
+  });
+}
+
+function drawLissajousMode(freq, rms) {
+  const W = cMem.width, H = cMem.height;
+  ctxMem.fillStyle = 'rgba(2,6,8,0.06)';
+  ctxMem.fillRect(0,0,W,H);
+
+  const cx = W/2, cy = H/2;
+  const R = Math.min(W,H)*0.44;
+  const f = freq > 50 ? freq : 220;
+  const noteIdx = freqToNote(f).note;
+  if(noteIdx < 0) return;
+
+  // Draw Lissajous for dominant harmonic ratio
+  const ratios = [[1,1],[2,1],[3,2],[4,3],[5,4],[5,3],[6,5],[7,4],[8,5]];
+  const ri = noteIdx % ratios.length;
+  const [a,b] = ratios[ri];
+  const steps = 2000;
+  const phase = lissPhase;
+
+  ctxMem.beginPath();
+  const hue = (noteIdx * 30 + f/880*120) % 360;
+  const alpha = 0.15 + rms * 5;
+  ctxMem.strokeStyle = `hsla(${hue},80%,60%,${Math.min(0.85,alpha)})`;
+  ctxMem.lineWidth = 1.2;
+  ctxMem.shadowColor = `hsl(${hue},100%,65%)`;
+  ctxMem.shadowBlur = 6 + rms*30;
+  for(let i=0;i<=steps;i++){
+    const t=(i/steps)*Math.PI*2*Math.max(a,b);
+    const x=cx+R*Math.sin(a*t+phase);
+    const y=cy+R*Math.sin(b*t);
+    i===0?ctxMem.moveTo(x,y):ctxMem.lineTo(x,y);
+  }
+  ctxMem.stroke();
+  ctxMem.shadowBlur=0;
+
+  // Concentric rings
+  for(let r=1;r<=4;r++){
+    const rad=r/5*R;
+    ctxMem.strokeStyle=`rgba(0,229,255,${0.05+curConf*0.1})`;
+    ctxMem.lineWidth=0.5;
+    ctxMem.beginPath();
+    ctxMem.arc(cx,cy,rad,0,Math.PI*2);
+    ctxMem.stroke();
+  }
+  lissPhase += 0.003 + rms*0.05;
+}
+
+// ── SIDEBAR CANVASES ──
+
+function drawEigen() {
+  const W = cEigen.width, H = cEigen.height;
+  if(W<4||H<4) return;
+  ctxEigen.clearRect(0,0,W,H);
+
+  const xStep = W/HIST;
+
+  // λ1 line (dominant)
+  ctxEigen.strokeStyle = '#00e5ffcc';
+  ctxEigen.lineWidth = 1.5;
+  ctxEigen.beginPath();
+  for(let i=0;i<HIST;i++){
+    const x=i*xStep;
+    const y=H-eigen1H[i]*(H-4)-2;
+    i===0?ctxEigen.moveTo(x,y):ctxEigen.lineTo(x,y);
+  }
+  ctxEigen.stroke();
+
+  // λ2 line
+  ctxEigen.strokeStyle = '#76ff0388';
+  ctxEigen.lineWidth = 1;
+  ctxEigen.beginPath();
+  for(let i=0;i<HIST;i++){
+    const x=i*xStep;
+    const y=H-eigen2H[i]*(H-4)-2;
+    i===0?ctxEigen.moveTo(x,y):ctxEigen.lineTo(x,y);
+  }
+  ctxEigen.stroke();
+
+  // λ3 bars
+  for(let i=0;i<HIST;i++){
+    const bH=eigen3H[i]*(H-4);
+    ctxEigen.fillStyle=`rgba(224,64,251,${0.2+eigen3H[i]*0.5})`;
+    ctxEigen.fillRect(i*xStep, H-bH, xStep, bH);
+  }
+
+  // Labels
+  ctxEigen.fillStyle='#1a3040';
+  ctxEigen.font='7px JetBrains Mono';
+  ctxEigen.fillText('λ₁',2,10);
+  ctxEigen.fillText('λ₂',2,H/2);
+  ctxEigen.fillText('λ₃',2,H-4);
+  // Current values
+  ctxEigen.fillStyle='#00e5ff';
+  ctxEigen.fillText(curEigen[0].toFixed(3),W-36,10);
+}
+
+function drawLissMini() {
+  const W = cLiss.width, H = cLiss.height;
+  if(W<4||H<4) return;
+  ctxLiss.fillStyle='rgba(2,6,8,0.15)';
+  ctxLiss.fillRect(0,0,W,H);
+
+  const cx=W/2, cy=H/2;
+  const R=Math.min(W,H)*0.43;
+  const f = curFreq>50?curFreq:220;
+  const noteIdx = freqToNote(f).note;
+  if(noteIdx<0) return;
+
+  const ratios=[[1,1],[2,1],[3,2],[4,3],[5,4],[5,3],[6,5],[7,4]];
+  const [a,b]=ratios[noteIdx%ratios.length];
+  const steps=600;
+  const hue=(noteIdx*30+f/880*100)%360;
+
+  ctxLiss.beginPath();
+  ctxLiss.strokeStyle=`hsl(${hue},80%,55%)`;
+  ctxLiss.lineWidth=1;
+  ctxLiss.shadowColor=`hsl(${hue},100%,60%)`;
+  ctxLiss.shadowBlur=4;
+  for(let i=0;i<=steps;i++){
+    const t=(i/steps)*Math.PI*2*Math.max(a,b);
+    const x=cx+R*0.9*Math.sin(a*t+lissPhase);
+    const y=cy+R*0.9*Math.sin(b*t);
+    i===0?ctxLiss.moveTo(x,y):ctxLiss.lineTo(x,y);
+  }
+  ctxLiss.stroke();
+  ctxLiss.shadowBlur=0;
+
+  // Ratio label
+  ctxLiss.fillStyle='#1a3040';
+  ctxLiss.font='8px JetBrains Mono';
+  ctxLiss.fillText(`${a}:${b}`,4,H-4);
+}
+
+function drawCopula() {
+  const W = cCopula.width, H = cCopula.height;
+  if(W<4||H<4) return;
+  ctxCopula.clearRect(0,0,W,H);
+
+  const xStep=W/HIST;
+
+  // Confidence fill
+  for(let i=0;i<HIST;i++){
+    if(confH[i]>0.1){
+      ctxCopula.fillStyle=`rgba(0,229,255,${confH[i]*0.06})`;
+      ctxCopula.fillRect(i*xStep,0,xStep,H);
+    }
+  }
+
+  // Copula line
+  ctxCopula.strokeStyle='#e040fb';
+  ctxCopula.lineWidth=1.5;
+  ctxCopula.shadowColor='#e040fb';
+  ctxCopula.shadowBlur=4;
+  ctxCopula.beginPath();
+  for(let i=0;i<HIST;i++){
+    const x=i*xStep;
+    const y=H-copH[i]*(H-4)-2;
+    i===0?ctxCopula.moveTo(x,y):ctxCopula.lineTo(x,y);
+  }
+  ctxCopula.stroke();
+  ctxCopula.shadowBlur=0;
+
+  // Threshold
+  ctxCopula.strokeStyle='#1a3040';
+  ctxCopula.lineWidth=1;
+  ctxCopula.setLineDash([3,3]);
+  const ty=H-0.5*(H-4)-2;
+  ctxCopula.beginPath(); ctxCopula.moveTo(0,ty); ctxCopula.lineTo(W,ty); ctxCopula.stroke();
+  ctxCopula.setLineDash([]);
+
+  // Current dot
+  const cy2=H-copH[HIST-1]*(H-4)-2;
+  ctxCopula.fillStyle='#e040fb';
+  ctxCopula.shadowColor='#e040fb';
+  ctxCopula.shadowBlur=8;
+  ctxCopula.beginPath();
+  ctxCopula.arc(W-xStep/2,cy2,3,0,Math.PI*2);
+  ctxCopula.fill();
+  ctxCopula.shadowBlur=0;
+
+  ctxCopula.fillStyle='#e040fb';
+  ctxCopula.font='7px JetBrains Mono';
+  ctxCopula.fillText(copH[HIST-1].toFixed(3),W-34,10);
+}
+
+// ── UI UPDATE ──
+let lastNote='', lastLogTime=0;
+const noteLogEl = document.getElementById('note-log');
+
+function updateUI() {
+  const noteInfo = freqToNote(curFreq);
+  const noteName = noteInfo.name;
+
+  // Header
+  document.getElementById('hd-note').textContent = noteName;
+  document.getElementById('hd-freq').textContent = curFreq>50?curFreq.toFixed(1)+'Hz':'—';
+  document.getElementById('hd-conf').textContent = curConf.toFixed(2);
+  document.getElementById('hd-harm').textContent = curHarmony;
+  document.getElementById('hd-eigen').textContent = curEigen[0].toFixed(3);
+
+  // Sidebar pitch
+  document.getElementById('sb-note').textContent = noteName;
+  document.getElementById('sb-freq').textContent = curFreq>50?curFreq.toFixed(1)+' Hz':'— Hz';
+  document.getElementById('sb-cents').textContent = curFreq>50?`${curCents>0?'+':''}${curCents.toFixed(1)} ¢`:'± — ¢';
+  document.getElementById('conf-bar').style.width = (curConf*100).toFixed(1)+'%';
+
+  // Spectral metrics
+  const maxCent = 8000;
+  document.getElementById('mb-cent').style.width=(curCentroid/maxCent*100).toFixed(1)+'%';
+  document.getElementById('mv-cent').textContent=curCentroid>0?curCentroid.toFixed(0):'—';
+  document.getElementById('mb-flux').style.width=Math.min(curFlux/0.5*100,100).toFixed(1)+'%';
+  document.getElementById('mv-flux').textContent=curFlux.toFixed(3);
+  document.getElementById('mb-ent').style.width=(curEntropy*100).toFixed(1)+'%';
+  document.getElementById('mv-ent').textContent=curEntropy.toFixed(3);
+  document.getElementById('mb-flat').style.width=(curFlat*100).toFixed(1)+'%';
+  document.getElementById('mv-flat').textContent=curFlat.toFixed(3);
+
+  // Membrane HUD
+  document.getElementById('mhud-freq').textContent=`f = ${curFreq>50?curFreq.toFixed(1):'—'} Hz`;
+  document.getElementById('mhud-eigen').textContent=
+    `λ₁=${curEigen[0].toFixed(3)}  λ₂=${curEigen[1].toFixed(3)}  λ₃=${curEigen[2].toFixed(3)}`;
+
+  // Footer
+  document.getElementById('ft-rms').textContent=(curRMS*100).toFixed(1)+'%';
+  document.getElementById('ft-frame').textContent=frameCount;
+  document.getElementById('ft-harm').textContent=curHarmony;
+
+  // Note log
+  const now=performance.now();
+  if(noteName!==lastNote && curConf>0.3 && now-lastLogTime>600) {
+    lastNote=noteName; lastLogTime=now;
+    const t=new Date().toISOString().substr(11,8);
+    const e=document.createElement('div');
+    e.className='log-e';
+    e.innerHTML=`<span class="lt">${t}</span> <span class="ln">${noteName}</span> <span class="lc">λ=${curEigen[0].toFixed(2)}</span>`;
+    noteLogEl.prepend(e);
+    if(noteLogEl.children.length>40) noteLogEl.removeChild(noteLogEl.lastChild);
+  }
+}
+
+// ── MAIN LOOP ──
+function loop() {
+  if(!running) { requestAnimationFrame(loop); idleTick(); return; }
+
+  const sr = audioCtx.sampleRate;
+  const bufLen = analyser.frequencyBinCount;
+
+  const timeData = new Float32Array(analyser.fftSize);
+  const freqData = new Uint8Array(bufLen);
+  const magData  = new Float32Array(bufLen);
+
+  analyser.getFloatTimeDomainData(timeData);
+  analyser.getByteFrequencyData(freqData);
+  for(let k=0;k<bufLen;k++) magData[k]=freqData[k]/255;
+
+  // Pitch
+  const { freq, confidence, rms } = detectPitch(timeData, sr);
+  curFreq = freq; curConf = confidence; curRMS = rms;
+
+  const noteInfo = freqToNote(freq);
+  curNote = noteInfo.note;
+  curCents = noteInfo.cents;
+
+  // Spectral
+  curCentroid = spectralCentroid(magData, sr, analyser.fftSize);
+  curFlat = spectralFlatness(magData);
+  curFlux = spectralFlux(magData, prevMag ? prevMag : null);
+  curEntropy = shannonEntropy(magData);
+  prevMag = magData.slice();
+
+  // Onset
+  const isOnset = curFlux > 0.3;
+
+  // Eigenvalues
+  curEigen = computeEigenvalues(freqData);
+
+  // Copula
+  curCopula = (confidence + (1-curFlat) + (1-curEntropy)) / 3;
+
+  // Harmony (note amplitudes from spectrum)
+  const noteAmps = new Float32Array(12);
+  for(let k=1;k<bufLen;k++){
+    const f=k*sr/analyser.fftSize;
+    if(f<50||f>5000) continue;
+    const midi=69+12*Math.log2(f/440);
+    const n=((Math.round(midi)%12)+12)%12;
+    noteAmps[n]+=magData[k];
+  }
+  const maxN=Math.max(...noteAmps,1e-9);
+  for(let i=0;i<12;i++) noteAmps[i]/=maxN;
+  curHarmony=detectHarmony(noteAmps);
+
+  // Shift histories
+  pitchH.copyWithin(0,1); pitchH[HIST-1]=freq;
+  confH.copyWithin(0,1);  confH[HIST-1]=confidence;
+  centH.copyWithin(0,1);  centH[HIST-1]=curCentroid;
+  fluxH.copyWithin(0,1);  fluxH[HIST-1]=curFlux;
+  entrH.copyWithin(0,1);  entrH[HIST-1]=curEntropy;
+  copH.copyWithin(0,1);   copH[HIST-1]=curCopula;
+  onsetH.copyWithin(0,1); onsetH[HIST-1]=isOnset?1:0;
+  eigen1H.copyWithin(0,1); eigen1H[HIST-1]=curEigen[0];
+  eigen2H.copyWithin(0,1); eigen2H[HIST-1]=curEigen[1];
+  eigen3H.copyWithin(0,1); eigen3H[HIST-1]=curEigen[2];
+
+  memPhase += 0.04 + curRMS * 0.5;
+
+  // Draw membrane
+  if(memMode==='water')        drawWater(freq, rms);
+  else if(memMode==='chladni') drawChladni(freq, rms);
+  else if(memMode==='topo')    drawTopo(freq, rms);
+  else if(memMode==='lissajous') drawLissajousMode(freq, rms);
+
+  // Draw sidebars
+  drawEigen();
+  drawLissMini();
+  drawCopula();
+  updateUI();
+
+  document.getElementById('ft-sr').textContent = sr;
+  frameCount++;
+  requestAnimationFrame(loop);
+}
+
+// ── IDLE TICK ──
+function idleTick() {
+  memPhase += 0.015;
+  lissPhase += 0.003;
+
+  // Gentle idle on membrane
+  const W=cMem.width, H=cMem.height;
+  ctxMem.fillStyle='rgba(2,6,8,0.04)';
+  ctxMem.fillRect(0,0,W,H);
+
+  const cx=W/2, cy=H/2;
+  for(let r=1;r<=6;r++){
+    const rad=r/7*Math.min(W,H)*0.46;
+    const pulse=Math.sin(memPhase+r*0.8)*3;
+    ctxMem.strokeStyle=`rgba(0,229,255,${0.03+0.02*Math.sin(memPhase+r)})`;
+    ctxMem.lineWidth=0.5;
+    ctxMem.beginPath();
+    ctxMem.arc(cx,cy,rad+pulse,0,Math.PI*2);
+    ctxMem.stroke();
+  }
+
+  drawLissMini();
+  frameCount++;
+}
+
+// ── MODE SWITCH ──
+function setMembraneMode(mode) {
+  memMode = mode;
+  document.getElementById('mhud-mode').textContent='MODE: '+mode.toUpperCase();
+  document.getElementById('ft-mode').textContent=mode.toUpperCase();
+  // Clear membrane
+  ctxMem.fillStyle='#02060a';
+  ctxMem.fillRect(0,0,cMem.width,cMem.height);
+  // Update button states
+  ['water','chladni','topo','lissajous'].forEach(m => {
+    const b=document.getElementById('btn-mode-'+m);
+    if(b) b.classList.toggle('mode-active',m===mode);
+  });
+}
+
+// ── MIC CONTROL ──
+document.getElementById('btn-mic').addEventListener('click', async () => {
+  if(running){
+    running=false;
+    if(micStream) micStream.getTracks().forEach(t=>t.stop());
+    document.getElementById('btn-mic').textContent='▶ MIC';
+    document.getElementById('btn-mic').classList.remove('active');
+    return;
+  }
+  try{
+    const stream = await navigator.mediaDevices.getUserMedia({audio:{
+      echoCancellation:false, noiseSuppression:false, autoGainControl:false
+    }});
+    micStream=stream;
+    audioCtx=new(window.AudioContext||window.webkitAudioContext)();
+    analyser=audioCtx.createAnalyser();
+    analyser.fftSize=FFT_SIZE;
+    analyser.smoothingTimeConstant=0.75;
+    const src=audioCtx.createMediaStreamSource(stream);
+    src.connect(analyser);
+    running=true;
+    document.getElementById('btn-mic').textContent='■ STOP';
+    document.getElementById('btn-mic').classList.add('active');
+    document.getElementById('ft-sr').textContent=audioCtx.sampleRate;
+  }catch(e){
+    alert('Micrófono no disponible: '+e.message);
+  }
+});
+
+// ── KEYBOARD SHORTCUTS ──
+document.addEventListener('keydown', e=>{
+  const map={'w':'water','c':'chladni','t':'topo','l':'lissajous'};
+  if(map[e.key]) setMembraneMode(map[e.key]);
+  if(e.key==='m'){document.getElementById('btn-mic').click();}
+});
+
+// ── INIT ──
+window.addEventListener('resize', ()=>{resize(); initWater();});
+resize();
+initWater();
+loop();
+
+// Sync sidebar canvas sizes after layout
+setTimeout(()=>{
+  [cEigen,cLiss,cCopula].forEach(c=>{
+    c.width=c.parentElement.clientWidth-20||160;
+  });
+  cEigen.height=80; cLiss.height=100; cCopula.height=60;
+},100);
+</script>
+</body>
+</html>
