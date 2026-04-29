@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Bubble Musical Grid Edition</title>
+<style>
+html,body{
+  margin:0;
+  background:#000;
+  overflow:hidden;
+  font-family:Arial,Helvetica,sans-serif;
+}
+canvas{display:block;}
+
+#ui{
+  position:fixed;
+  top:10px;
+  left:10px;
+  z-index:10;
+  color:#fff;
+  background:rgba(0,0,0,.45);
+  padding:12px;
+  border-radius:10px;
+  width:260px;
+  font-size:13px;
+}
+
+label{display:block;margin:8px 0 4px;}
+input,button,select{
+  width:100%;
+}
+button{
+  margin-top:6px;
+  padding:7px;
+  background:#111;
+  color:#fff;
+  border:1px solid #444;
+  cursor:pointer;
+}
+small{opacity:.8;}
+</style>
+</head>
+<body>
+
+<div id="ui">
+<button id="micBtn">🎤 Micrófono</button>
+
+<label>🎵 Canción</label>
+<input type="file" id="fileInput" accept="audio/*">
+
+<label>Modo</label>
+<select id="mode">
+<option value="calm">Contemplativo</option>
+<option value="live">Performance</option>
+</select>
+
+<label>Sensibilidad</label>
+<input type="range" id="sens" min="1" max="100" value="70">
+
+<label>Contraste</label>
+<input type="range" id="contrast" min="1" max="100" value="78">
+
+<label>Persistencia</label>
+<input type="range" id="trail" min="1" max="100" value="18">
+
+<small>
+Versión legible con atención al grid.
+</small>
+</div>
+
+<canvas id="cv"></canvas>
+
+<script>
+//////////////////////////////////////////////////
+// CANVAS
+//////////////////////////////////////////////////
+const cv = document.getElementById("cv");
+const ctx = cv.getContext("2d");
+
+function resize(){
+  cv.width = innerWidth;
+  cv.height = innerHeight;
+}
+addEventListener("resize", resize);
+resize();
+
+//////////////////////////////////////////////////
+// GRID VISIBLE
+//////////////////////////////////////////////////
+const GW = 82;
+const GH = 82;
+
+let u = new Float32Array(GW*GH);
+let v = new Float32Array(GW*GH);
+let n = new Float32Array(GW*GH);
+
+function idx(x,y){ return x+y*GW; }
+
+function inside(x,y){
+  const dx=(x-GW/2)/(GW*0.40);
+  const dy=(y-GH/2)/(GH*0.40);
+  return dx*dx+dy*dy <= 1;
+}
+
+//////////////////////////////////////////////////
+// AUDIO
+//////////////////////////////////////////////////
+let audioCtx=null, analyser=null, sourceNode=null, audioEl=null;
+let data=null;
+
+let rms=0,bass=0,mids=0,highs=0;
+let srms=0,sbass=0,smids=0,shighs=0;
+let beat=0;
+let cooldown=0;
+
+async function ensureAudio(){
+  if(audioCtx) return;
+
+  audioCtx = new (window.AudioContext||window.webkitAudioContext)();
+  analyser = audioCtx.createAnalyser();
+  analyser.fftSize = 1024;
+  analyser.smoothingTimeConstant = 0.86;
+  data = new Uint8Array(analyser.frequencyBinCount);
+}
+
+function disconnectSource(){
+  if(sourceNode){
+    try{sourceNode.disconnect();}catch(e){}
+    sourceNode=null;
+  }
+}
+
+micBtn.onclick = async ()=>{
+  await ensureAudio();
+  disconnectSource();
+
+  const stream = await navigator.mediaDevices.getUserMedia({audio:true});
+  sourceNode = audioCtx.createMediaStreamSource(stream);
+  sourceNode.connect(analyser);
+
+  micBtn.innerText="🎤 Activo";
+};
+
+fileInput.onchange = async (e)=>{
+  const file = e.target.files[0];
+  if(!file) return;
+
+  await ensureAudio();
+  disconnectSource();
+
+  if(audioEl) audioEl.pause();
+
+  audioEl = new Audio(URL.createObjectURL(file));
+  audioEl.loop = true;
+
+  sourceNode = audioCtx.createMediaElementSource(audioEl);
+  sourceNode.connect(analyser);
+  analyser.connect(audioCtx.destination);
+
+  audioEl.play();
+};
+
+function updateAudio(){
+
+  if(!analyser) return;
+
+  analyser.getByteFrequencyData(data);
+
+  let s=0,b=0,m=0,h=0;
+
+  for(let i=0;i<data.length;i++){
+
+    const val = data[i]/255;
+    s += val;
+
+    if(i<18) b+=val;
+    else if(i<90) m+=val;
+    else h+=val;
+  }
+
+  rms = s/data.length;
+  bass = b/18;
+  mids = m/72;
+  highs = h/(data.length-90);
+
+  srms = srms*0.92 + rms*0.08;
+  sbass = sbass*0.88 + bass*0.12;
+  smids = smids*0.92 + mids*0.08;
+  shighs = shighs*0.88 + highs*0.12;
+
+  const pulse = bass - sbass*0.86;
+
+  if(pulse > 0.07 && cooldown<=0){
+    beat = 1;
+    cooldown = 12;
+  }
+
+  beat *= 0.9;
+  cooldown--;
+}
+
+//////////////////////////////////////////////////
+// PHYSICS
+//////////////////////////////////////////////////
+let t=0;
+let activeMode=5;
+let modeTime=0;
+
+function inject(){
+
+  const sens = +sensEl.value/100;
+  const style = modeSel.value;
+
+  if(style==="calm"){
+    if(modeTime<=0){
+      activeMode = 3 + Math.floor(smids*4);
+      modeTime = 130;
+    }
+  }else{
+    if(beat>0.3 || modeTime<=0){
+      activeMode = 4 + Math.floor(smids*7);
+      modeTime = 45;
+    }
+  }
+
+  modeTime--;
+
+  const drive = srms*sens*0.012;
+
+  const cx=GW/2;
+  const cy=GH/2;
+
+  for(let y=1;y<GH-1;y++){
+    for(let x=1;x<GW-1;x++){
+
+      if(!inside(x,y)) continue;
+
+      const dx=x-cx;
+      const dy=y-cy;
+      const ang=Math.atan2(dy,dx);
+      const dist=Math.sqrt(dx*dx+dy*dy);
+
+      const radial =
+        Math.sin(dist*0.45 - t*(1.6+sbass*3));
+
+      const modal =
+        Math.cos(activeMode*ang + t*(0.8+smids*2));
+
+      const center = Math.exp(-dist*0.08);
+
+      v[idx(x,y)] += drive*(0.55*radial + 0.45*modal);
+
+      if(beat>0.05){
+        v[idx(x,y)] += beat*center*0.022;
+      }
+    }
+  }
+}
+
+function updateField(){
+
+  for(let y=1;y<GH-1;y++){
+    for(let x=1;x<GW-1;x++){
+
+      const k=idx(x,y);
+
+      if(!inside(x,y)){
+        u[k]=0; v[k]=0;
+        continue;
+      }
+
+      const lap =
+        u[idx(x+1,y)] +
+        u[idx(x-1,y)] +
+        u[idx(x,y+1)] +
+        u[idx(x,y-1)] -
+        4*u[k];
+
+      v[k] += lap*0.18;
+      v[k] *= 0.982;
+      n[k] = u[k] + v[k];
+    }
+  }
+
+  let temp=u; u=n; n=temp;
+}
+
+//////////////////////////////////////////////////
+// RENDER
+//////////////////////////////////////////////////
+function draw(){
+
+  const W=cv.width;
+  const H=cv.height;
+
+  const sx=W/GW;
+  const sy=H/GH;
+
+  const fade = +trailEl.value/100;
+
+  ctx.fillStyle=`rgba(0,0,0,${0.06+fade*0.12})`;
+  ctx.fillRect(0,0,W,H);
+
+  const contrast = +contrastEl.value/100;
+
+  // aro superior
+  ctx.strokeStyle=`rgba(255,255,255,${0.25+beat*0.4})`;
+  ctx.lineWidth=2+beat*2;
+  ctx.beginPath();
+  ctx.ellipse(
+    W/2,
+    H*0.18,
+    W*(0.18+sbass*0.015),
+    H*(0.03+sbass*0.006),
+    0,0,Math.PI*2
+  );
+  ctx.stroke();
+
+  for(let y=1;y<GH-1;y++){
+    for(let x=1;x<GW-1;x++){
+
+      if(!inside(x,y)) continue;
+
+      const val = u[idx(x,y)];
+
+      const gx = u[idx(x+1,y)] - u[idx(x-1,y)];
+      const gy = u[idx(x,y+1)] - u[idx(x,y-1)];
+
+      const edge = Math.abs(gx)+Math.abs(gy);
+
+      const p = Math.max(-1,Math.min(1,val*3.4*contrast));
+
+      let r,g,b;
+
+      if(p>=0){
+        r = 40 + p*160;
+        g = 120 + p*120;
+        b = 255;
+      }else{
+        const q=-p;
+        r = 0;
+        g = 35 + q*40;
+        b = 90 + q*140;
+      }
+
+      // feedback musical evidente
+      r += beat*90 + mids*40;
+      g += bass*80;
+      b += highs*60;
+
+      // bordes brillantes
+      r += edge*80;
+      g += edge*60;
+      b += edge*110;
+
+      ctx.fillStyle=`rgb(${Math.min(255,r)},${Math.min(255,g)},${Math.min(255,b)})`;
+
+      ctx.fillRect(
+        x*sx,
+        y*sy,
+        sx-1,
+        sy-1
+      );
+    }
+  }
+}
+
+//////////////////////////////////////////////////
+// LOOP
+//////////////////////////////////////////////////
+const sensEl=document.getElementById("sens");
+const contrastEl=document.getElementById("contrast");
+const trailEl=document.getElementById("trail");
+const modeSel=document.getElementById("mode");
+
+function loop(){
+  t += 0.03;
+  updateAudio();
+  inject();
+  updateField();
+  draw();
+  requestAnimationFrame(loop);
+}
+loop();
+
+</script>
+</body>
+</html>
